@@ -634,6 +634,40 @@ function zoomCenter(factor){const r=viewport.getBoundingClientRect();zoomAt(fact
 function fitView(){if(!nodes.length&&!arrows.length){zoom=1;ox=viewport.clientWidth/2;oy=viewport.clientHeight/2;updateCamera();return}const xs=[...nodes.flatMap(n=>[n.x,n.x+n.w]),...arrows.flatMap(a=>[a.x1,a.x2])],ys=[...nodes.flatMap(n=>[n.y,n.y+n.h]),...arrows.flatMap(a=>[a.y1,a.y2])];let minX=Math.min(...xs)-100,minY=Math.min(...ys)-100,maxX=Math.max(...xs)+100,maxY=Math.max(...ys)+100;zoom=Math.max(.2,Math.min(1.5,Math.min(viewport.clientWidth/(maxX-minX),viewport.clientHeight/(maxY-minY))));ox=(viewport.clientWidth-(maxX+minX)*zoom)/2;oy=(viewport.clientHeight-(maxY+minY)*zoom)/2;updateCamera();scheduleSave()}
 const toolbar=$('#context-toolbar');
 const ctxInput={bg:$('#context-bg'),fg:$('#context-fg'),font:$('#context-font'),width:$('#context-width'),height:$('#context-height')};
+const ctxPopover=$('#context-popover');let activeContextPane=null;
+function closeContextPopover(){
+ activeContextPane=null;ctxPopover.hidden=true;
+ $$('.context-pane',ctxPopover).forEach(el=>el.hidden=true);
+ $$('[data-context-panel]',toolbar).forEach(el=>el.setAttribute('aria-expanded','false'));
+}
+function openContextPopover(name){
+ if(activeContextPane===name){closeContextPopover();return}
+ const obj=contextObject();if(!obj||locked)return;
+ activeContextPane=name;ctxPopover.hidden=false;
+ $$('.context-pane',ctxPopover).forEach(el=>el.hidden=el.dataset.pane!==name);
+ $$('[data-context-panel]',toolbar).forEach(el=>el.setAttribute('aria-expanded',String(el.dataset.contextPanel===name)));
+ $('#context-more').open=false;
+ placeContextToolbar();
+}
+$$('[data-context-panel]',toolbar).forEach(el=>el.addEventListener('click',()=>openContextPopover(el.dataset.contextPanel)));
+const swatchColors={
+ bg:['#ffffff','#fff1b8','#ffd5df','#e7d6ff','#cfe5ff','#c3e9d3','#e8e8e8','#f9c999','#3d61a3','#26364b','#7755a8','#a8dfeb','#e7dfca','#b3c4e8'],
+ fg:['#243047','#000000','#ffffff','#345dba','#673ca9','#d23f61','#208056','#af582a','#66788b','#f39c3a','#2c99ae','#bf5478','#3b465f','#7d6bb3']
+};
+for(const type of ['bg','fg']){
+ const target=$('[data-colors="'+type+'"]',ctxPopover);
+ for(const color of swatchColors[type]){
+  const b=document.createElement('button');b.type='button';b.title=color;b.setAttribute('aria-label','Cor '+color);b.style.backgroundColor=color;
+  b.onclick=()=>{ctxInput[type].value=color;applyContextChange(type)};
+  target.append(b);
+ }
+}
+$$('[data-step-font]',ctxPopover).forEach(button=>button.onclick=()=>{
+ const next=Math.max(10,Math.min(72,(Number(ctxInput.font.value)||16)+Number(button.dataset.stepFont)));
+ ctxInput.font.value=String(next);applyContextChange('font')
+});
+$('#context-more').addEventListener('toggle',()=>{if($('#context-more').open)closeContextPopover()});
+$('#context-direct-link').onclick=()=>$('#context-link').click();
 function contextObject(){
  if(!contextTarget)return null;
  const node=nodes.find(n=>n.id===contextTarget.nodeId);
@@ -682,14 +716,19 @@ function updateContextToolbar(){
   if(document.activeElement!==ctxInput[key])ctxInput[key].value=contextValue(obj,key);
  }
  const isArrow=obj.kind==='arrow';
+ const canFont=obj.kind==='branch'||(obj.kind==='node'&&['note','text','template'].includes(obj.node.type));
+ $('#context-show-fg').disabled=!canFont;
+ $('#context-show-font').disabled=!canFont;
+ $('#context-direct-link').hidden=obj.kind!=='node';
+ if(!canFont&&(activeContextPane==='font'||activeContextPane==='fg'))closeContextPopover();
  ctxInput.fg.disabled=isArrow||(obj.kind==='node'&&!['note','text','template'].includes(obj.node.type));
  ctxInput.font.disabled=ctxInput.fg.disabled;
  ctxInput.height.disabled=isArrow;
  ctxInput.width.min=isArrow?'1':obj.kind==='branch'?'120':'120';
  ctxInput.width.max=isArrow?'16':obj.kind==='branch'?'420':'1600';
  ctxInput.width.title=isArrow?'Espessura da seta':'Largura do quadrinho';
- ctxInput.width.parentElement.firstChild.textContent=isArrow?'Traço ':'Larg. ';
- ctxInput.bg.parentElement.firstChild.textContent=isArrow?'Seta ':'Fundo ';
+ ctxInput.width.previousSibling && (ctxInput.width.previousSibling.textContent=isArrow?'Traço ':'Largura ');
+ ctxInput.bg.parentElement.firstChild.textContent=isArrow?'Cor da seta ':'Escolher outra cor ';
  $('#context-add-child').hidden=obj.kind!=='branch';
  $('#context-duplicate').hidden=obj.kind==='branch';
  $('#context-link').hidden=obj.kind!=='node';
@@ -701,12 +740,13 @@ function updateContextToolbar(){
 }
 function selectContextBranch(nodeId,branchId){
  if(locked)return;
+ if(!contextTarget||contextTarget.nodeId!==nodeId||contextTarget.branchId!==branchId)closeContextPopover();
  if(!nodes.find(n=>n.id===nodeId)?.tree?.some(t=>t.id===branchId))return;
  selected=nodeId;contextTarget={nodeId,branchId};
  $$('.node').forEach(el=>el.classList.toggle('selected',el.dataset.id===nodeId));
  updateContextToolbar();
 }
-function hideContextToolbar(){contextTarget=null;toolbar.hidden=true;$('#context-more').open=false;$$('.tree-card').forEach(el=>el.classList.remove('context-selected'))}
+function hideContextToolbar(){contextTarget=null;toolbar.hidden=true;closeContextPopover();$('#context-more').open=false;$$('.tree-card').forEach(el=>el.classList.remove('context-selected'))}
 function applyContextChange(key){
  if(locked)return;
  const obj=contextObject();if(!obj)return;
@@ -779,13 +819,17 @@ $('#context-add-child').onclick=()=>{
 };
 document.addEventListener('scroll',()=>requestAnimationFrame(placeContextToolbar),true);
 window.addEventListener('resize',()=>requestAnimationFrame(placeContextToolbar));
-document.addEventListener('pointerdown',e=>{if(!toolbar.hidden&&!toolbar.contains(e.target)&&!e.target.closest('.node,.arrow-hit,.arrow-control,.arrow-bend-handle'))hideContextToolbar()},true);
+document.addEventListener('pointerdown',e=>{
+ if(toolbar.hidden||toolbar.contains(e.target))return;
+ if(e.target.closest('.node,.arrow-hit,.arrow-control,.arrow-bend-handle')){closeContextPopover();return}
+ hideContextToolbar()
+},true);
 function setTool(next){if(locked&&next!=='hand')return;tool=next;$$('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===next));viewport.classList.toggle('hand',next==='hand');viewport.classList.toggle('pen',next==='pen');viewport.classList.toggle('arrow',next==='arrow'||next==='curved-arrow');setToolsOpen(false);$('#tool-label').textContent=({select:'Seleção',hand:'Movimento',note:'Nota',text:'Texto',rect:'Retângulo',ellipse:'Círculo',pen:'Caneta',arrow:'Seta','curved-arrow':'Seta curva',link:'Conexão'})[next]||next}
 function selectNode(id){
  if(locked&&id!==null)return;
  selected=id;$$('.node').forEach(el=>el.classList.toggle('selected',el.dataset.id===id));
  if(id===null)hideContextToolbar();
- else if(!contextTarget||contextTarget.nodeId!==id)contextTarget={nodeId:id};
+ else if(!contextTarget||contextTarget.nodeId!==id){closeContextPopover();contextTarget={nodeId:id}}
  const n=nodes.find(n=>n.id===id),arrow=arrows.find(a=>a.id===id);
  inspector.hidden=true;$('#move-section').hidden=!n;$('#arrow-bend-panel').hidden=!arrow;$('#hyperlink-panel').hidden=!n;
  if(arrow)$('#arrow-bend').value=arrow.curve||0;
