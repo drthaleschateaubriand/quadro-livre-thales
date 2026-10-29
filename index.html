@@ -613,8 +613,10 @@ function placeContextToolbar(){
  const w=Math.min(toolbar.offsetWidth||740,screenWidth-16);
  const x=Math.max(8,Math.min(screenWidth-w-8,r.left+r.width/2-w/2));
  const top=r.top-toolbar.offsetHeight-9;
+ const below=r.bottom+9;
+ const preferred=top>=74?top:(below+toolbar.offsetHeight<window.innerHeight-8?below:74);
  toolbar.style.left=Math.round(x)+'px';
- toolbar.style.top=Math.max(74,Math.min(window.innerHeight-toolbar.offsetHeight-8,top))+'px';
+ toolbar.style.top=Math.max(74,Math.min(window.innerHeight-toolbar.offsetHeight-8,preferred))+'px';
 }
 function contextValue(obj,key){
  if(obj.kind==='arrow')return {bg:obj.arrow.color||'#394c78',fg:'#243047',font:16,width:obj.arrow.width||3,height:0}[key];
@@ -889,7 +891,7 @@ function renderTreeTemplate(el,n){
  const root=n.tree.find(t=>t.parentId===null)||n.tree[0],childrenOf=id=>n.tree.filter(t=>t.parentId===id);
  function addBranch(parentId){
   if(locked)return;const parent=n.tree.find(t=>t.id===parentId);if(!parent)return;
-  checkpoint();n.tree.push({id:uid(),parentId,label:n.kind==='mindmap'?'Novo ramo':'Novo cargo',detail:'Editar descrição',side:n.kind==='mindmap'?((childrenOf(root.id).length%2)?'left':'right'):'right'});
+  checkpoint();n.tree.push({id:uid(),parentId,label:n.kind==='mindmap'?'Novo ramo':'Novo cargo',detail:'Editar descrição',side:n.kind==='mindmap'?(parent.id===root.id?((childrenOf(root.id).length%2)?'left':'right'):(parent.side||'right')):'right'});
   render();selectNode(n.id);scheduleSave();
  }
  function removeBranch(id){
@@ -901,7 +903,7 @@ function renderTreeTemplate(el,n){
  const positions=new Map(),cardW=Math.max(185,...n.tree.map(t=>t.cardWidth||162)),cardH=Math.max(67,...n.tree.map(t=>t.cardHeight||67));
  let width=960,height=480;
  if(n.kind==='mindmap'){
-  const xroot=485,spacingX=202,spacingY=92;
+  const xroot=Math.max(485,cardW*2+90),spacingX=cardW+48,spacingY=cardH+30;
   const branches=childrenOf(root.id);
   const groups={left:branches.filter(x=>x.side==='left'),right:branches.filter(x=>x.side!=='left')};
   function leaves(id){const c=childrenOf(id);return c.length?c.reduce((sum,b)=>sum+leaves(b.id),0):1}
@@ -927,9 +929,12 @@ function renderTreeTemplate(el,n){
  surface.style.width=width+'px';surface.style.height=height+'px';
  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('width',width);svg.setAttribute('height',height);
  for(const item of n.tree){const p=positions.get(item.id),q=positions.get(item.parentId);if(!p||!q)continue;
-  let d;if(n.kind==='mindmap'){const goingRight=p.x>q.x;const sx=q.x+(goingRight?(item.parentId===root.id?185:cardW):0),ex=p.x+(goingRight?0:cardW),sy=q.y+cardH/2,ey=p.y+cardH/2;
+  const parent=n.tree.find(t=>t.id===item.parentId);if(!parent)continue;
+  const ownWidth=item.cardWidth||162,parentWidth=parent.cardWidth||(parent.id===root.id?185:162);
+  const ownHeight=item.cardHeight||67,parentHeight=parent.cardHeight||67;
+  let d;if(n.kind==='mindmap'){const goingRight=p.x>q.x;const sx=q.x+(goingRight?parentWidth:0),ex=p.x+(goingRight?0:ownWidth),sy=q.y+parentHeight/2,ey=p.y+ownHeight/2;
    d=`M${sx} ${sy} C${sx+(ex-sx)*.5} ${sy},${sx+(ex-sx)*.5} ${ey},${ex} ${ey}`;
-  }else{const sx=q.x+cardW/2,sy=q.y+cardH,ex=p.x+cardW/2,ey=p.y;d=`M${sx} ${sy} V${sy+18} H${ex} V${ey}`}
+  }else{const sx=q.x+parentWidth/2,sy=q.y+parentHeight,ex=p.x+ownWidth/2,ey=p.y;d=`M${sx} ${sy} V${sy+(ey-sy)/2} H${ex} V${ey}`}
   const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',d);path.setAttribute('stroke',n.kind==='mindmap'?'#8b78cf':'#6485c2');path.setAttribute('stroke-width','2.5');path.setAttribute('fill','none');svg.append(path)
  }
  surface.append(svg);
