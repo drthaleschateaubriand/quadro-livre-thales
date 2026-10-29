@@ -35,6 +35,28 @@
 /* Pinça de dois dedos estabilizada */
 #viewport .node .node-text{touch-action:none}
 #viewport.pinching .node{pointer-events:none!important}
+
+/* Organizador de pastas v1.4 */
+.folders-toggle{min-width:41px;padding:0 10px}
+.folders-panel{position:absolute;left:12px;top:80px;bottom:18px;width:min(310px,calc(100vw - 24px));z-index:15;background:#fff;border-radius:16px;border:1px solid #e1e7f1;box-shadow:0 14px 38px #1d35522e;padding:16px;overflow:auto}
+.folders-panel[hidden]{display:none}
+.folder-head{display:flex;justify-content:space-between;align-items:center;font-size:16px;color:#293750}
+.folder-actions{margin:18px 0 12px}
+.folder-actions button{width:100%}
+.folder-tree{display:flex;flex-direction:column;gap:5px}
+.folder-row{display:flex;align-items:center;gap:5px;border-radius:9px}
+.folder-row.current{background:#edf2ff}
+.folder-entry{border:0;background:transparent;color:#41516e;text-align:left;flex:1;min-width:0;padding:10px 8px;border-radius:8px;display:flex;align-items:center;gap:7px;font-size:13px}
+.folder-entry:hover{background:#f4f6fc}
+.folder-entry .folder-title{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder-entry small{margin-left:auto;color:#8796b1}
+.folder-mini{font-size:12px;border:0;background:transparent;border-radius:6px;padding:7px;cursor:pointer;color:#66728a}
+.folder-mini:hover{background:#e9eef8}
+.folder-help{font-size:11px;line-height:1.5;color:#7a879e;border-top:1px solid #e9edf4;padding-top:15px;margin-top:20px}
+.move-section{border-top:1px solid #e8ecf4;margin-top:14px;padding-top:12px;display:flex;flex-direction:column;gap:8px}
+.move-section label{font-size:11px;color:#63718b}
+.move-section select{width:100%;background:white;border:1px solid #dce3ef;border-radius:8px;padding:8px;font-size:12px}
+@media(max-width:760px){.folders-toggle{min-width:35px;padding:0 7px}.folders-panel{top:72px;bottom:12px}.folder-actions{margin:12px 0}}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -42,6 +64,7 @@
 <body>
   <header class="topbar">
     <button type="button" id="tool-menu" class="menu-toggle" aria-label="Abrir ferramentas" aria-controls="tools-panel" aria-expanded="false" title="Mostrar ou ocultar ferramentas"><span class="menu-lines" aria-hidden="true">☰</span><span class="menu-caption">Ferramentas</span></button>
+    <button type="button" id="folders-toggle" class="menu-toggle folders-toggle" title="Minhas pastas" aria-controls="folders-panel" aria-expanded="false" aria-label="Abrir pastas"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3z"/></svg><span class="menu-caption">Pastas</span></button>
     <div class="brand"><div class="brand-icon">Q</div><div><strong>Quadro Livre</strong><small>Seu espaço de ideias</small></div></div>
     <div class="docinfo"><input aria-label="Nome do quadro" id="board-title" value="Meu primeiro quadro" maxlength="90"><span id="save-status">Pronto para editar</span></div>
     <div class="top-actions">
@@ -67,6 +90,13 @@
     <button class="tool" data-tool="link" title="Conectar dois cartões (L)"><span>↗</span><small>Ligar</small></button>
     <div class="rail-sep"></div>
     <button class="tool" id="insert-files" title="Importar arquivos"><span>▣</span><small>Arquivo</small></button>
+    <button class="tool" id="insert-folder" title="Criar pasta"><span>▱</span><small>Pasta</small></button>
+  </aside>
+  <aside id="folders-panel" class="folders-panel" hidden aria-label="Organizador de pastas">
+    <div class="folder-head"><strong>Minhas pastas</strong><button id="folders-close" class="icon-button" type="button" aria-label="Fechar pastas">×</button></div>
+    <div class="folder-actions"><button id="new-folder" class="primary" type="button">+ Nova pasta</button></div>
+    <div id="folders-tree" class="folder-tree"></div>
+    <p class="folder-help">Cada pasta tem seu próprio quadro. Os dados ficam salvos neste navegador; exporte um backup para usar em outro aparelho.</p>
   </aside>
   <main id="viewport" aria-label="Quadro infinito" tabindex="0">
     <div id="grid"></div>
@@ -85,12 +115,13 @@
     <label>Cor do elemento <input type="color" id="node-color" value="#fff1b8"></label>
     <label>Largura <input type="range" id="node-width" min="120" max="900" value="280"><output id="width-label">280 px</output></label>
     <div class="inspector-actions"><button class="secondary" id="duplicate-node">Duplicar</button><button class="danger" id="delete-node">Excluir</button></div>
+    <div id="move-section" class="move-section"><label for="move-folder-target">Mover elemento para pasta</label><select id="move-folder-target"></select><button class="secondary" id="move-node" type="button">Mover para pasta</button></div>
   </aside>
   <div class="bottom-left"><span id="tool-label">Seleção</span><span class="separator">•</span><span id="count-label">0 elementos</span></div>
   <div id="toast" role="status" aria-live="polite"></div>
   <input id="file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.json,.png,.jpg,.jpeg,.webp,.gif,.svg,.pptx,.xlsx,.csv,.html,*/*" hidden>
   <dialog id="welcome-dialog"><div class="dialog-body"><div class="dialog-mark">Q</div><h2>Seu quadro está pronto</h2><p>Crie notas, mova elementos, importe documentos e organize tudo em um espaço infinito.</p><p class="privacy-note"><strong>Privacidade:</strong> nesta versão, o salvamento é feito no navegador deste dispositivo. Para usar o mesmo quadro em outro aparelho, exporte e importe o arquivo do projeto. A sincronização em nuvem ainda não está ativada.</p><button class="primary" id="welcome-close">Começar a criar</button></div></dialog>
-<script>/* Quadro Livre v1.3.0 - editor de quadro infinito, sem servidor e sem rastreamento */
+<script>/* Quadro Livre v1.4.0 - editor de quadro infinito, sem servidor e sem rastreamento */
 (() => {
 'use strict';
 const $ = (q, el=document) => el.querySelector(q);
@@ -98,7 +129,8 @@ const $$ = (q, el=document) => [...el.querySelectorAll(q)];
 const viewport=$('#viewport'),world=$('#world'),nodesEl=$('#nodes'),lines=$('#lines'),grid=$('#grid');
 const input=$('#file-input'),title=$('#board-title'),status=$('#save-status'),inspector=$('#inspector');
 const SAVE_KEY='quadro-livre-board-v1', OPENED_KEY='quadro-livre-welcome';
-let nodes=[], connectors=[], paths=[], selected=null, tool='select', interaction=null, zoom=1, ox=innerWidth*.42, oy=(innerHeight-70)*.43, history=[], future=[], db=null, saveTimer=null, toastTimer=null, spaceHeld=false, locked=false;
+let nodes=[], connectors=[], paths=[], arrows=[], selected=null, tool='select', interaction=null, zoom=1, ox=innerWidth*.42, oy=(innerHeight-70)*.43, history=[], future=[], db=null, saveTimer=null, toastTimer=null, spaceHeld=false, locked=false;
+const WORKSPACE_KEY='quadro-livre-workspace-v2';let workspace=null,activeFolderId='root';
 const activeTouches=new Map();let pinch=null,touchGestureConsumed=false;
 const cssColors={note:'#fff1b8',text:'#ffffff',rect:'#cfe5ff',ellipse:'#e4d8ff',file:'#ffffff'};
 let uid=()=>globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)+Date.now();
@@ -140,10 +172,137 @@ function updateUndoButtons(){$('[data-action=undo]').disabled=locked||!history.l
 function restoreSnapshot(str){try{let o=JSON.parse(str);nodes=o.nodes||[];connectors=o.connectors||[];paths=o.paths||[];selected=null;render();scheduleSave()}catch(e){toast('Não foi possível restaurar.')}}
 function scheduleSave(){status.textContent='Salvando neste navegador…';clearTimeout(saveTimer);saveTimer=setTimeout(save,450)}
 function openDatabase(){return new Promise((resolve,reject)=>{if(!('indexedDB' in globalThis)){resolve(null);return}const req=indexedDB.open('quadro-livre-local',1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains('boards'))db.createObjectStore('boards')};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
-function idbGet(){return new Promise((resolve,reject)=>{if(!db)return resolve(localStorage.getItem(SAVE_KEY));const t=db.transaction('boards','readonly');const r=t.objectStore('boards').get(SAVE_KEY);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-function idbSet(val){return new Promise((resolve,reject)=>{if(!db){localStorage.setItem(SAVE_KEY,val);return resolve()}const t=db.transaction('boards','readwrite');t.objectStore('boards').put(val,SAVE_KEY);t.oncomplete=resolve;t.onerror=()=>reject(t.error)})}
-async function save(){const data={version:1,title:title.value||'Meu quadro',nodes,connectors,paths,locked,camera:{zoom,ox,oy},savedAt:new Date().toISOString()};try{await idbSet(JSON.stringify(data));status.textContent='Salvo neste dispositivo'}catch(e){status.textContent='Não foi possível salvar';toast('Espaço local insuficiente. Exporte seu quadro como arquivo.')}}
-async function init(){try{db=await openDatabase();const raw=await idbGet();if(raw){const data=JSON.parse(raw);nodes=data.nodes||[];connectors=data.connectors||[];paths=data.paths||[];title.value=data.title||'Meu quadro';locked=Boolean(data.locked);if(data.camera){zoom=Math.max(.2,Math.min(4,data.camera.zoom||1));ox=data.camera.ox||0;oy=data.camera.oy||0}}else{nodes=[makeNode('note',-150,-60,{w:330,h:200,text:'Bem-vindo ao Quadro Livre!\n\nDê dois cliques nesta nota para escrever. Arraste-a pela borda superior.'}),makeNode('text',-165,-155,{text:'Meu espaço de estudos',w:470,h:85})]}}catch(e){toast('Armazenamento indisponível. Exporte seu trabalho regularmente.')}render();updateCamera();setLocked(locked,true);if(!localStorage.getItem(OPENED_KEY))$('#welcome-dialog').showModal()}
+function idbGet(key=SAVE_KEY){return new Promise((resolve,reject)=>{if(!db)return resolve(localStorage.getItem(key));const t=db.transaction('boards','readonly');const r=t.objectStore('boards').get(key);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+function idbSet(val,key=SAVE_KEY){return new Promise((resolve,reject)=>{if(!db){localStorage.setItem(key,val);return resolve()}const t=db.transaction('boards','readwrite');t.objectStore('boards').put(val,key);t.oncomplete=resolve;t.onerror=()=>reject(t.error)})}
+function emptyBoard(name='Nova pasta'){return{title:name,nodes:[],connectors:[],paths:[],arrows:[],locked:false,camera:{zoom:1,ox:innerWidth*.38,oy:innerHeight*.32}}}
+function captureBoard(){return JSON.parse(JSON.stringify({title:title.value||'Meu quadro',nodes,connectors,paths,arrows,locked,camera:{zoom,ox,oy}}))}
+function snapshotWorkspace(){if(!workspace)workspace={version:2,folders:[],canvases:{root:emptyBoard('Meu primeiro quadro')},activeFolderId:'root'};workspace.canvases[activeFolderId]=captureBoard();workspace.activeFolderId=activeFolderId;return JSON.stringify(workspace)}
+async function save(){const serialized=snapshotWorkspace();try{await idbSet(serialized,WORKSPACE_KEY);status.textContent='Salvo neste dispositivo'}catch(e){status.textContent='Não foi possível salvar';toast('Espaço local insuficiente. Exporte um backup do projeto.')}}
+function openFolder(id){
+ if(!workspace||(id!=='root'&&!workspace.folders.some(x=>x.id===id)))return;
+ workspace.canvases[activeFolderId]=captureBoard();activeFolderId=id;workspace.activeFolderId=id;
+ const data=workspace.canvases[id]||emptyBoard(getFolderName(id));workspace.canvases[id]=data;
+ nodes=data.nodes||[];connectors=data.connectors||[];paths=data.paths||[];arrows=data.arrows||[];
+ title.value=data.title||getFolderName(id);locked=Boolean(data.locked);
+ zoom=Math.max(.2,Math.min(4,data.camera?.zoom||1));
+ ox=Number.isFinite(data.camera?.ox)?data.camera.ox:innerWidth*.38;
+ oy=Number.isFinite(data.camera?.oy)?data.camera.oy:innerHeight*.32;
+ selected=null;history=[];future=[];interaction=null;
+ render();updateCamera();setLocked(locked,true);updateUndoButtons();renderFolders();closeFolders();scheduleSave();
+}
+function getFolderName(id){return id==='root'?'Meu quadro principal':(workspace?.folders.find(f=>f.id===id)?.name||'Pasta')}
+function closeFolders(){const el=$('#folders-panel');el.hidden=true;$('#folders-toggle').setAttribute('aria-expanded','false')}
+function openFolders(){setToolsOpen(false);const el=$('#folders-panel');el.hidden=false;$('#folders-toggle').setAttribute('aria-expanded','true');renderFolders()}
+function toggleFolders(){$('#folders-panel').hidden?openFolders():closeFolders()}
+function folderList(){return[{id:'root',name:'Meu quadro principal',depth:0},...listSubfolders(null,0)]}
+function listSubfolders(parent,depth){
+ const arr=[];
+ for(const f of workspace.folders.filter(x=>x.parentId===parent).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'))){
+  arr.push({...f,depth});if(depth<7)arr.push(...listSubfolders(f.id,depth+1));
+ }return arr;
+}
+function renderFolderTargets(){
+ const dropdown=$('#move-folder-target');dropdown.replaceChildren();
+ for(const f of folderList()){const o=document.createElement('option');o.value=f.id;o.textContent=('  '.repeat(f.depth))+(f.id==='root'?'Início':f.name);dropdown.append(o)}
+ dropdown.value='root';
+}
+function renderFolders(){
+ if(!workspace)return;
+ const tree=$('#folders-tree');tree.replaceChildren();
+ for(const f of folderList()){
+  const row=document.createElement('div');row.className='folder-row'+(activeFolderId===f.id?' current':'');
+  row.style.paddingLeft=Math.min(f.depth,7)*13+'px';
+  const btn=document.createElement('button');btn.className='folder-entry';btn.type='button';
+  const icon=document.createElement('span');icon.textContent=f.id==='root'?'▣':'▱';
+  const text=document.createElement('span');text.className='folder-title';text.textContent=f.name;
+  const count=document.createElement('small');count.textContent=(workspace.canvases[f.id]?.nodes||[]).length;
+  btn.append(icon,text,count);btn.addEventListener('click',()=>openFolder(f.id));row.append(btn);
+  if(f.id!=='root'){
+   const rename=document.createElement('button');rename.className='folder-mini';rename.textContent='✎';rename.title='Renomear pasta';rename.setAttribute('aria-label','Renomear '+f.name);
+   rename.onclick=()=>renameFolder(f.id);row.append(rename);
+   const remove=document.createElement('button');remove.className='folder-mini';remove.textContent='×';remove.title='Excluir pasta vazia';remove.setAttribute('aria-label','Excluir '+f.name);
+   remove.onclick=()=>deleteFolder(f.id);row.append(remove);
+  }
+  tree.append(row);
+ }
+ renderFolderTargets();
+}
+function createFolder(){
+ if(!workspace)return;
+ const name=prompt('Nome da nova pasta:','Nova pasta');
+ if(name===null)return;const clean=name.trim().slice(0,80);
+ if(!clean)return toast('Informe um nome para a pasta.');
+ const id=uid(),parentId=activeFolderId==='root'?null:activeFolderId;
+ workspace.canvases[activeFolderId]=captureBoard();
+ workspace.folders.push({id,name:clean,parentId});
+ workspace.canvases[id]=emptyBoard(clean);openFolder(id);openFolders();
+ toast('Pasta criada: '+clean);
+}
+function renameFolder(id){
+ const f=workspace.folders.find(x=>x.id===id);if(!f)return;
+ const name=prompt('Renomear pasta:',f.name);
+ if(name===null)return;if(!name.trim())return toast('O nome não pode ficar vazio.');
+ f.name=name.trim().slice(0,80);
+ if(activeFolderId===id)title.value=f.name;
+ renderFolders();scheduleSave();
+}
+function deleteFolder(id){
+ const f=workspace.folders.find(x=>x.id===id);if(!f)return;
+ const data=id===activeFolderId?captureBoard():workspace.canvases[id];
+ if((data?.nodes?.length||0)||(data?.paths?.length||0)||(data?.arrows?.length||0)||(data?.connectors?.length||0)||workspace.folders.some(x=>x.parentId===id))return toast('Só é possível excluir pastas vazias e sem subpastas.');
+ if(!confirm('Excluir a pasta vazia "'+f.name+'"?'))return;
+ if(activeFolderId===id)openFolder(f.parentId||'root');
+ workspace.folders=workspace.folders.filter(x=>x.id!==id);
+ delete workspace.canvases[id];renderFolders();scheduleSave();
+}
+function moveSelectedToFolder(){
+ if(locked||!selected||!workspace)return;
+ const target=$('#move-folder-target').value;
+ if(!target||target===activeFolderId)return toast('Selecione uma pasta diferente.');
+ const n=nodes.find(x=>x.id===selected);if(!n)return;
+ const folder=workspace.canvases[target]||emptyBoard(getFolderName(target));
+ checkpoint();
+ folder.nodes.push(JSON.parse(JSON.stringify(n)));workspace.canvases[target]=folder;
+ nodes=nodes.filter(x=>x.id!==selected);
+ connectors=connectors.filter(x=>x.from!==selected&&x.to!==selected);
+ selected=null;render();scheduleSave();
+ toast('Elemento movido para '+getFolderName(target)+'.');
+}
+$('#folders-toggle').addEventListener('click',toggleFolders);
+$('#folders-close').addEventListener('click',closeFolders);
+$('#new-folder').addEventListener('click',createFolder);
+$('#insert-folder').addEventListener('click',()=>{setToolsOpen(false);createFolder()});
+$('#move-node').addEventListener('click',moveSelectedToFolder);
+async function init(){
+ try{
+  db=await openDatabase();
+  const stored=await idbGet(WORKSPACE_KEY);
+  if(stored){
+   const parsed=JSON.parse(stored);
+   if(!parsed||!parsed.canvases||!Array.isArray(parsed.folders))throw Error('Workspace inválido');
+   workspace=parsed;
+  }else{
+   const raw=await idbGet(SAVE_KEY);
+   let original;
+   if(raw){original=JSON.parse(raw)}
+   else{original=emptyBoard('Meu primeiro quadro');original.nodes=[
+    makeNode('note',-150,-60,{w:330,h:200,text:'Bem-vindo ao Quadro Livre!\\n\\nDê dois cliques nesta nota para escrever.'}),
+    makeNode('text',-165,-155,{text:'Meu espaço de estudos',w:470,h:85})]}
+   workspace={version:2,folders:[],canvases:{root:{...emptyBoard('Meu primeiro quadro'),...original}},activeFolderId:'root'};
+  }
+ }catch(e){
+  console.warn('Pastas: erro ao carregar dados locais',e);
+  toast('Problema ao abrir armazenamento. Exporte um backup.');
+  if(!workspace)workspace={version:2,folders:[],canvases:{root:emptyBoard('Meu primeiro quadro')},activeFolderId:'root'};
+ }
+ activeFolderId=workspace.canvases[workspace.activeFolderId]?workspace.activeFolderId:'root';
+ const data=workspace.canvases[activeFolderId]||emptyBoard('Meu primeiro quadro');
+ nodes=data.nodes||[];connectors=data.connectors||[];paths=data.paths||[];arrows=data.arrows||[];
+ title.value=data.title||'Meu primeiro quadro';locked=Boolean(data.locked);
+ if(data.camera){zoom=Math.max(.2,Math.min(4,data.camera.zoom||1));ox=data.camera.ox??0;oy=data.camera.oy??0}
+ render();updateCamera();setLocked(locked,true);renderFolders();scheduleSave();
+ if(!localStorage.getItem(OPENED_KEY))$('#welcome-dialog').showModal();
+}
 function updateCamera(){world.style.transform=`translate(${ox}px,${oy}px) scale(${zoom})`;grid.style.backgroundSize=`${24*zoom}px ${24*zoom}px`;grid.style.backgroundPosition=`${ox}px ${oy}px`;$('#zoom-reset').textContent=`${Math.round(zoom*100)}%`}
 const toWorld=(clientX,clientY)=>{let r=viewport.getBoundingClientRect();return{x:(clientX-r.left-ox)/zoom,y:(clientY-r.top-oy)/zoom}};
 function centerWorld(){const r=viewport.getBoundingClientRect();return toWorld(r.left+r.width/2,r.top+r.height/2)}
@@ -151,7 +310,7 @@ function zoomAt(factor,clientX,clientY){const r=viewport.getBoundingClientRect()
 function zoomCenter(factor){const r=viewport.getBoundingClientRect();zoomAt(factor,r.left+r.width/2,r.top+r.height/2)}
 function fitView(){if(!nodes.length){zoom=1;ox=viewport.clientWidth/2;oy=viewport.clientHeight/2;updateCamera();return}let minX=Math.min(...nodes.map(n=>n.x))-100,minY=Math.min(...nodes.map(n=>n.y))-100,maxX=Math.max(...nodes.map(n=>n.x+n.w))+100,maxY=Math.max(...nodes.map(n=>n.y+n.h))+100;zoom=Math.max(.2,Math.min(1.5,Math.min(viewport.clientWidth/(maxX-minX),viewport.clientHeight/(maxY-minY))));ox=(viewport.clientWidth-(maxX+minX)*zoom)/2;oy=(viewport.clientHeight-(maxY+minY)*zoom)/2;updateCamera();scheduleSave()}
 function setTool(next){if(locked&&next!=='hand')return;tool=next;$$('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===next));viewport.classList.toggle('hand',next==='hand');viewport.classList.toggle('pen',next==='pen');setToolsOpen(false);$('#tool-label').textContent=({select:'Seleção',hand:'Movimento',note:'Nota',text:'Texto',rect:'Retângulo',ellipse:'Círculo',pen:'Caneta',link:'Conexão'})[next]||next}
-function selectNode(id){if(locked&&id!==null)return;selected=id;$$('.node').forEach(el=>el.classList.toggle('selected',el.dataset.id===id));const n=nodes.find(n=>n.id===id);inspector.hidden=!n;if(n){$('#node-color').value=/^#[a-fA-F0-9]{6}$/.test(n.color)?n.color:'#ffffff';$('#node-width').value=n.w;$('#width-label').textContent=`${n.w} px`}}
+function selectNode(id){if(locked&&id!==null)return;selected=id;$$('.node').forEach(el=>el.classList.toggle('selected',el.dataset.id===id));const n=nodes.find(n=>n.id===id);inspector.hidden=!n;$('#move-section').hidden=!n;if(n){$('#node-color').value=/^#[a-fA-F0-9]{6}$/.test(n.color)?n.color:'#ffffff';$('#node-width').value=n.w;$('#width-label').textContent=`${n.w} px`}}
 function addNode(type,x,y,more={}){if(locked)return null;checkpoint();let n=makeNode(type,x,y,more);nodes.push(n);render();selectNode(n.id);scheduleSave();return n}
 function textEscape(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 function fileIcon(type){return type?.includes('pdf')?'PDF':type?.includes('presentation')||type?.includes('powerpoint')?'PPT':type?.includes('sheet')||type?.includes('excel')?'XLS':'ARQ'}
@@ -252,11 +411,28 @@ function pointerUp(e){
 function deleteSelected(){if(locked||!selected)return;checkpoint();nodes=nodes.filter(n=>n.id!==selected);connectors=connectors.filter(c=>c.from!==selected&&c.to!==selected);selected=null;render();scheduleSave()}
 function duplicateSelected(){if(locked)return;const n=nodes.find(n=>n.id===selected);if(!n)return;const copy=JSON.parse(JSON.stringify(n));copy.id=uid();copy.x+=35;copy.y+=35;checkpoint();nodes.push(copy);render();selectNode(copy.id);scheduleSave()}
 function downloadData(src,name){let a=document.createElement('a');a.href=src;a.download=name;a.rel='noopener noreferrer';document.body.append(a);a.click();a.remove()}
-function exportProject(){const project={version:1,application:'Quadro Livre',title:title.value||'Meu quadro',nodes,connectors,paths,locked,camera:{zoom,ox,oy},exportedAt:new Date().toISOString()};const blob=new Blob([JSON.stringify(project,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);downloadData(url,(title.value||'meu-quadro').replace(/[^a-z0-9À-ÿ\-_ ]/gi,'').replace(/\s+/g,'-')+'.quadro.json');setTimeout(()=>URL.revokeObjectURL(url),10000);toast('Projeto exportado. Guarde o arquivo para abrir em outro dispositivo.')}
+function exportProject(){const project={...JSON.parse(snapshotWorkspace()),application:'Quadro Livre',exportedAt:new Date().toISOString()};const blob=new Blob([JSON.stringify(project,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);downloadData(url,(title.value||'meu-quadro').replace(/[^a-z0-9À-ÿ\-_ ]/gi,'').replace(/\s+/g,'-')+'.quadro.json');setTimeout(()=>URL.revokeObjectURL(url),10000);toast('Projeto exportado. Guarde o arquivo para abrir em outro dispositivo.')}
 function readAsDataURL(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(file)})}
 function readAsText(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsText(file)})}
 function readAsBuffer(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsArrayBuffer(file)})}
-async function importProject(file){if(locked)return;let o=JSON.parse(await readAsText(file));if(!Array.isArray(o.nodes)||o.application!=='Quadro Livre')throw Error('Não é um arquivo de projeto do Quadro Livre');if(o.nodes.length>2000)throw Error('Projeto excede o limite de elementos');checkpoint();nodes=o.nodes;connectors=Array.isArray(o.connectors)?o.connectors:[];paths=Array.isArray(o.paths)?o.paths:[];title.value=String(o.title||'Quadro importado');selected=null;render();fitView();scheduleSave();toast('Quadro importado com sucesso.')}
+async function importProject(file){
+ if(locked)return;
+ const o=JSON.parse(await readAsText(file));
+ if(o.application!=='Quadro Livre')throw Error('Arquivo inválido');
+ if(o.version===2&&o.canvases&&Array.isArray(o.folders)){
+  if(!confirm('Substituir todas as pastas e quadros atuais pelo backup importado?'))return;
+  workspace=o;activeFolderId='root';workspace.activeFolderId='root';
+  const root=workspace.canvases.root||emptyBoard('Meu quadro principal');
+  nodes=root.nodes||[];connectors=root.connectors||[];paths=root.paths||[];arrows=root.arrows||[];
+  title.value=root.title||'Meu quadro principal';locked=!!root.locked;
+  history=[];future=[];selected=null;render();setLocked(locked,true);fitView();renderFolders();scheduleSave();
+  toast('Pastas e quadros restaurados do backup.');return;
+ }
+ if(!Array.isArray(o.nodes)||o.nodes.length>2000)throw Error('Arquivo de projeto incompatível');
+ checkpoint();nodes=o.nodes;connectors=Array.isArray(o.connectors)?o.connectors:[];
+ paths=Array.isArray(o.paths)?o.paths:[];arrows=Array.isArray(o.arrows)?o.arrows:[];
+ title.value=String(o.title||'Quadro importado');selected=null;render();fitView();scheduleSave();toast('Quadro importado nesta pasta.');
+}
 function placeForFile(i,loc){const p=loc||centerWorld();return{x:p.x+(i%3)*370-140,y:p.y+Math.floor(i/3)*330-100}}
 async function importFiles(fileList,point){if(locked){toast('Destrave o quadro para importar arquivos.');return;}const files=[...fileList];if(!files.length)return;for(let i=0;i<files.length;i++){const f=files[i],p=placeForFile(i,point);try{if(/\.quadro\.json$/i.test(f.name)){await importProject(f);continue}if(f.type.startsWith('image/')){const url=await readAsDataURL(f);let w=340,h=250;try{let img=new Image();img.src=url;await img.decode();h=Math.max(120,Math.min(600,Math.round(340*img.naturalHeight/img.naturalWidth)))}catch(e){}addNode('file',p.x,p.y,{w,h:h+29,preview:'image',src:url,mime:f.type,name:f.name})}else if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){if(!window.pdfjsLib){const src=f.size<8e6?await readAsDataURL(f):null;addNode('file',p.x,p.y,{name:f.name,mime:'application/pdf',src,note:'Visualização de PDF indisponível. Baixe o arquivo.'});toast('Abra com internet para habilitar a visualização de PDFs.');continue}const data=new Uint8Array(await readAsBuffer(f));pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';let pdf=await pdfjsLib.getDocument({data}).promise;let max=Math.min(pdf.numPages,12);checkpoint();toast('Preparando PDF em alta resolução…');let rowTop=p.y,rowHeight=0;for(let pageNumber=1;pageNumber<=max;pageNumber++){let page=await pdf.getPage(pageNumber);let initial=page.getViewport({scale:1});const renderScale=Math.min(3.5,1900/initial.width,Math.sqrt(4400000/(initial.width*initial.height)));let vp=page.getViewport({scale:renderScale});let canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.ceil(vp.width));canvas.height=Math.max(1,Math.ceil(vp.height));const context=canvas.getContext('2d',{alpha:false});context.fillStyle='#ffffff';context.fillRect(0,0,canvas.width,canvas.height);await page.render({canvasContext:context,viewport:vp}).promise;let src=canvas.toDataURL('image/png'),mime='image/png';if(src.length>3000000){src=canvas.toDataURL('image/jpeg',.96);mime='image/jpeg'}canvas.width=0;canvas.height=0;const w=360,h=Math.max(100,Math.round(w*initial.height/initial.width)+29),col=(pageNumber-1)%3;if(col===0&&pageNumber>1){rowTop+=rowHeight+30;rowHeight=0}let px=p.x+col*390,py=rowTop;nodes.push(makeNode('file',px,py,{name:`${f.name} · página ${pageNumber}/${pdf.numPages}`,w,h,preview:'image',src,mime}));rowHeight=Math.max(rowHeight,h)}render();scheduleSave();toast(`PDF em alta definição: ${max} de ${pdf.numPages} páginas importadas${max<pdf.numPages?' (limite de 12)':''}.`)}else if(/\.docx$/i.test(f.name)&&window.mammoth){const buf=await readAsBuffer(f);const res=await mammoth.extractRawText({arrayBuffer:buf});const content=res.value||'Documento sem texto extraível';addNode('note',p.x,p.y,{text:content.slice(0,15000),w:500,h:340,color:'#ffffff'});toast('Texto do DOCX inserido como nota editável.')}else if(f.type.startsWith('text/')||/\.(txt|md|csv|html)$/i.test(f.name)){const content=await readAsText(f);addNode('note',p.x,p.y,{text:content.slice(0,20000),w:490,h:320,color:'#ffffff'});toast('Texto importado e editável.')}else{const src=f.size<7e6?await readAsDataURL(f):null;addNode('file',p.x,p.y,{name:f.name,mime:f.type||f.name.split('.').pop(),src,note:src?'Clique para baixar o anexo':'Arquivo grande: referência somente nesta versão'});if(!src)toast('Arquivo grande demais para guardar no navegador.')}}catch(e){console.error('Importação:',f.name,e);toast(`Não foi possível importar ${f.name}.`)}}}
 function deleteAll(){if(!confirm('Apagar todos os elementos deste quadro? Exporte um backup antes de confirmar.'))return;checkpoint();nodes=[];connectors=[];paths=[];selected=null;render();scheduleSave()}
@@ -267,7 +443,7 @@ $('#export-file').onclick=exportProject;$('#zoom-in').onclick=()=>zoomCenter(1.2
 $('#node-color').oninput=e=>{const n=nodes.find(n=>n.id===selected);if(!n||locked)return;n.color=e.target.value;const el=$(`.node[data-id="${n.id}"]`);if(el)el.style.background=n.color;scheduleSave()};$('#node-width').oninput=e=>{const n=nodes.find(n=>n.id===selected);if(!n||locked)return;n.w=Number(e.target.value);$('#width-label').textContent=n.w+' px';const el=$(`.node[data-id="${n.id}"]`);if(el)el.style.width=n.w+'px';drawLines();scheduleSave()};$('#duplicate-node').onclick=duplicateSelected;$('#delete-node').onclick=deleteSelected;title.addEventListener('input',scheduleSave);
 viewport.addEventListener('pointerdown',pointerDown);window.addEventListener('pointermove',pointerMove);window.addEventListener('pointerup',pointerUp);window.addEventListener('pointercancel',pointerUp);
 viewport.addEventListener('wheel',e=>{if(e.target.closest('.node-text'))return;e.preventDefault();if(e.ctrlKey||e.metaKey){zoomAt(Math.exp(-e.deltaY*.008),e.clientX,e.clientY)}else if(e.altKey){zoomAt(Math.exp(-e.deltaY*.003),e.clientX,e.clientY)}else{ox-=e.deltaX;oy-=e.deltaY;updateCamera();scheduleSave()}},{passive:false});
-window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,[contenteditable]'))return;const mod=e.ctrlKey||e.metaKey;if(locked){if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject()}else if(e.key==='Delete'||e.key==='Backspace'||(mod&&['z','y','d'].includes(e.key.toLowerCase())))e.preventDefault();return;}if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return}if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject();return}if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected();return}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();return}if(e.key==='Escape'){setToolsOpen(false);selected=null;selectNode(null);setTool('select');return}if(e.code==='Space'){spaceHeld=true;viewport.classList.add('hand');e.preventDefault();return}const short={v:'select',h:'hand',n:'note',t:'text',r:'rect',o:'ellipse',p:'pen',l:'link'};if(!mod&&short[e.key.toLowerCase()])setTool(short[e.key.toLowerCase()])});window.addEventListener('keyup',e=>{if(e.code==='Space'){spaceHeld=false;viewport.classList.toggle('hand',tool==='hand')}});
+window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,[contenteditable]'))return;const mod=e.ctrlKey||e.metaKey;if(locked){if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject()}else if(e.key==='Delete'||e.key==='Backspace'||(mod&&['z','y','d'].includes(e.key.toLowerCase())))e.preventDefault();return;}if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return}if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject();return}if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected();return}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();return}if(e.key==='Escape'){closeFolders();setToolsOpen(false);selected=null;selectNode(null);setTool('select');return}if(e.code==='Space'){spaceHeld=true;viewport.classList.add('hand');e.preventDefault();return}const short={v:'select',h:'hand',n:'note',t:'text',r:'rect',o:'ellipse',p:'pen',l:'link'};if(!mod&&short[e.key.toLowerCase()])setTool(short[e.key.toLowerCase()])});window.addEventListener('keyup',e=>{if(e.code==='Space'){spaceHeld=false;viewport.classList.toggle('hand',tool==='hand')}});
 viewport.addEventListener('dragenter',e=>{e.preventDefault();document.body.classList.add('dragging-files')});viewport.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy'});viewport.addEventListener('dragleave',e=>{if(!viewport.contains(e.relatedTarget))document.body.classList.remove('dragging-files')});viewport.addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('dragging-files');if(locked){toast('Destrave o quadro para importar arquivos.');return;}importFiles(e.dataTransfer.files,toWorld(e.clientX,e.clientY))});
 window.addEventListener('beforeunload',()=>{if(saveTimer)clearTimeout(saveTimer)});
 // Pinça estável: amortecimento, zona neutra e âncora fixa no ponto entre os dedos.
