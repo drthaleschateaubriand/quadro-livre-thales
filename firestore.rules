@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signedIn() { return request.auth != null; }
+  function owner(id) { return signedIn() && request.auth.uid == id; }
+  function verifiedMember(data) {
+   return signedIn()
+    && request.auth.token.email_verified == true
+    && request.auth.token.email is string
+    && data.members is map
+    && data.members.get(request.auth.token.email, 'none') in ['editor', 'viewer'];
+  }
+  function workspaceData(id) {
+   return get(/databases/$(database)/documents/workspaces/$(id)).data;
+  }
+  function canRead(id) {
+   return owner(id) ||
+    (signedIn() && exists(/databases/$(database)/documents/workspaces/$(id)) && verifiedMember(workspaceData(id)));
+  }
+  function canWrite(id) {
+   return owner(id) ||
+    (signedIn() && exists(/databases/$(database)/documents/workspaces/$(id))
+     && request.auth.token.email_verified == true
+     && workspaceData(id).members is map
+     && workspaceData(id).members.get(request.auth.token.email, 'none') == 'editor');
+  }
+  match /workspaces/{workspaceId} {
+   allow get: if owner(workspaceId) || verifiedMember(resource.data);
+   allow list: if false;
+   allow create: if owner(workspaceId)
+    && request.resource.data.ownerUid == workspaceId
+    && request.resource.data.members is map
+    && request.resource.data.members.size() <= 30;
+   allow update: if owner(workspaceId)
+    && resource.data.ownerUid == workspaceId
+    && request.resource.data.ownerUid == resource.data.ownerUid
+    && request.resource.data.members is map
+    && request.resource.data.members.size() <= 30;
+   allow delete: if owner(workspaceId);
+   match /boards/{boardId} {
+    allow get, list: if canRead(workspaceId);
+    allow create, update: if canWrite(workspaceId)
+     && request.resource.data.keys().hasOnly(['payload', 'updatedAt'])
+     && request.resource.data.payload is string
+     && request.resource.data.payload.size() < 800000;
+    allow delete: if owner(workspaceId);
+   }
+  }
+ }
+}
