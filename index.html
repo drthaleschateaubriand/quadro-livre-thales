@@ -345,6 +345,7 @@
       <div class="context-menu">
         <button id="context-duplicate" type="button">Duplicar elemento</button>
         <button id="context-link" type="button">Adicionar hyperlink</button>
+        <button id="context-curvature" type="button" hidden>Curvatura da seta</button>
         <button id="context-move" type="button">Mover para pasta</button>
         <button id="context-delete" type="button">Excluir elemento</button>
       </div>
@@ -645,6 +646,7 @@ function updateContextToolbar(){
  $('#context-add-child').hidden=obj.kind!=='branch';
  $('#context-duplicate').hidden=obj.kind==='branch';
  $('#context-link').hidden=obj.kind!=='node';
+ $('#context-curvature').hidden=obj.kind!=='arrow';
  $('#context-move').hidden=obj.kind!=='node';
  $('#context-delete').textContent=obj.kind==='branch'?'Excluir subtópico':obj.kind==='arrow'?'Excluir seta':'Excluir elemento';
  $$('.tree-card').forEach(el=>el.classList.toggle('context-selected',obj.kind==='branch'&&el.dataset.nodeId===obj.node.id&&el.dataset.branchId===obj.item.id));
@@ -697,6 +699,13 @@ $('#context-link').onclick=()=>{
  const link=raw.trim()?safeWebUrl(raw):'';
  if(raw.trim()&&!link)return toast('Use um link http:// ou https:// válido.');
  checkpoint();obj.node.href=link;render();scheduleSave();$('#context-more').open=false;
+};
+$('#context-curvature').onclick=()=>{
+ const obj=contextObject();if(!obj||obj.kind!=='arrow')return;
+ const answer=prompt('Curvatura da seta (-420 a 420, zero para reta):',String(obj.arrow.curve||0));
+ if(answer===null)return;
+ const value=Number(answer);if(!Number.isFinite(value)||value< -420||value>420)return toast('Informe um valor entre -420 e 420.');
+ checkpoint();obj.arrow.curve=value;drawLines();scheduleSave();$('#context-more').open=false;
 };
 $('#context-move').onclick=()=>{
  const obj=contextObject();if(!obj||obj.kind!=='node')return;
