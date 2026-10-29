@@ -33,8 +33,9 @@ async function fetchJSON(url, options={}) {
   let data;
   try { data = await response.json(); } catch { data = {}; }
   if (!response.ok) {
-    const error = new Error(response.status===403 ? 'Acesso negado pelo Firebase.' :
+    const error = new Error(response.status===401||response.status===403 ? 'Acesso negado pelo Firebase.' :
       response.status===404 ? 'Arquivo ou quadro não encontrado.' :
+      response.status===409||response.status===412 ? 'Este quadro foi alterado em outro dispositivo. Reabra a versão atual antes de editar novamente.' :
       'Erro na nuvem ('+response.status+').');
     error.status=response.status;
     throw error;
