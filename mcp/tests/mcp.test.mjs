@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mcpHandler, TOOLS} from '../src/index.js';
+import {mcpHandler, TOOLS} from '../src/mcp-handler.js';
 
 const base='https://quadro-livre-mcp.example.workers.dev/mcp';
 function request(method,params,id=1,headers={}) {
