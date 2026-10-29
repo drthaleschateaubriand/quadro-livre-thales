@@ -31,6 +31,10 @@
 #viewport.is-locked .hint button{pointer-events:none;opacity:.5}
 #board-title:read-only{cursor:default}
 @media(max-width:760px){.lock-toggle{width:36px;min-width:36px;height:36px;padding:0}.lock-toggle .lock-label{display:none}}
+
+/* Pinça de dois dedos estabilizada */
+#viewport .node .node-text{touch-action:none}
+#viewport.pinching .node{pointer-events:none!important}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -86,7 +90,7 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <input id="file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.json,.png,.jpg,.jpeg,.webp,.gif,.svg,.pptx,.xlsx,.csv,.html,*/*" hidden>
   <dialog id="welcome-dialog"><div class="dialog-body"><div class="dialog-mark">Q</div><h2>Seu quadro está pronto</h2><p>Crie notas, mova elementos, importe documentos e organize tudo em um espaço infinito.</p><p class="privacy-note"><strong>Privacidade:</strong> nesta versão, o salvamento é feito no navegador deste dispositivo. Para usar o mesmo quadro em outro aparelho, exporte e importe o arquivo do projeto. A sincronização em nuvem ainda não está ativada.</p><button class="primary" id="welcome-close">Começar a criar</button></div></dialog>
-<script>/* Quadro Livre v1.2.0 - editor de quadro infinito, sem servidor e sem rastreamento */
+<script>/* Quadro Livre v1.3.0 - editor de quadro infinito, sem servidor e sem rastreamento */
 (() => {
 'use strict';
 const $ = (q, el=document) => el.querySelector(q);
@@ -95,6 +99,7 @@ const viewport=$('#viewport'),world=$('#world'),nodesEl=$('#nodes'),lines=$('#li
 const input=$('#file-input'),title=$('#board-title'),status=$('#save-status'),inspector=$('#inspector');
 const SAVE_KEY='quadro-livre-board-v1', OPENED_KEY='quadro-livre-welcome';
 let nodes=[], connectors=[], paths=[], selected=null, tool='select', interaction=null, zoom=1, ox=innerWidth*.42, oy=(innerHeight-70)*.43, history=[], future=[], db=null, saveTimer=null, toastTimer=null, spaceHeld=false, locked=false;
+const activeTouches=new Map();let pinch=null,touchGestureConsumed=false;
 const cssColors={note:'#fff1b8',text:'#ffffff',rect:'#cfe5ff',ellipse:'#e4d8ff',file:'#ffffff'};
 let uid=()=>globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)+Date.now();
 const toolsPanel=$('#tools-panel'),toolsMenu=$('#tool-menu');
@@ -154,14 +159,96 @@ function render(){const fragment=document.createDocumentFragment();nodes.forEach
  if(['note','text'].includes(n.type)){const content=document.createElement('div');content.className='node-text';content.contentEditable=String(!locked);content.tabIndex=locked?-1:0;content.spellcheck=true;content.textContent=n.text||'';let before='';content.addEventListener('focus',()=>{selectNode(n.id);before=snapshot()});content.addEventListener('input',()=>{n.text=content.innerText.replace(/\u00a0/g,' ');scheduleSave()});content.addEventListener('blur',()=>{if(before!==snapshot()){history.push(before);if(history.length>45)history.shift();future=[];updateUndoButtons()}});el.append(content)}
  if(n.type==='file'){if(n.preview==='image'&&n.src){const img=document.createElement('img');img.className='media-content';img.src=n.src;img.alt=n.name||'Imagem';img.draggable=false;el.append(img)}else{const body=document.createElement('div');body.className='file-content';const badge=document.createElement('div');badge.className='file-emoji';badge.textContent=fileIcon(n.mime);body.append(badge);const name=document.createElement('strong');name.textContent=n.name||'Documento';body.append(name);let info=document.createElement('small');info.textContent=n.note||'Arquivo anexado';body.append(info);if(n.src){let btn=document.createElement('button');btn.className='open-file';btn.textContent='Abrir / baixar';btn.addEventListener('pointerdown',e=>e.stopPropagation());btn.onclick=()=>downloadData(n.src,n.name||'arquivo');body.append(btn)}el.append(body)}}
  const resize=document.createElement('div');resize.className='resize-handle';resize.title='Arraste para redimensionar';el.append(resize);handle.addEventListener('pointerdown',e=>startNodeInteraction(e,n,'move'));resize.addEventListener('pointerdown',e=>startNodeInteraction(e,n,'resize'));
- el.addEventListener('pointerdown',e=>{if(tool==='link'){e.stopPropagation();if(!selected){selectNode(n.id);toast('Agora clique em outro elemento para ligar.')}else if(selected!==n.id){checkpoint();connectors.push({id:uid(),from:selected,to:n.id});selectNode(n.id);drawLines();scheduleSave();toast('Elementos conectados.')}return}if(e.target.closest('.node-text')||e.target.closest('.open-file')){selectNode(n.id);return}if(e.target===el||e.target.tagName==='IMG'){startNodeInteraction(e,n,'move')}});
+ el.addEventListener('pointerdown',e=>{if(tool==='link'){e.stopPropagation();if(touchGestureConsumed||pinch||activeTouches.size>1)return;
+ if(e.pointerType==='touch'){interaction={kind:'pending-link',id:n.id,pointerId:e.pointerId};return}
+ completeNodeLink(n.id);return}if(e.target.closest('.node-text')||e.target.closest('.open-file')){selectNode(n.id);return}if(e.target===el||e.target.tagName==='IMG'){startNodeInteraction(e,n,'move')}});
  el.addEventListener('dblclick',e=>{const edit=$('.node-text',el);if(edit){edit.focus();const range=document.createRange();range.selectNodeContents(edit);range.collapse(false);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range)}});
  fragment.append(el)});nodesEl.replaceChildren(fragment);drawLines();$('#empty-hint').style.display=nodes.length?'none':'flex';$('#count-label').textContent=`${nodes.length} elemento${nodes.length!==1?'s':''}`;selectNode(selected);}
+function completeNodeLink(id){
+ if(locked)return;
+ if(!selected){selectNode(id);toast('Agora clique em outro elemento para ligar.');return}
+ if(selected!==id){checkpoint();connectors.push({id:uid(),from:selected,to:id});selectNode(id);drawLines();scheduleSave();toast('Elementos conectados.')}
+}
 function drawLines(){lines.replaceChildren();const ns='http://www.w3.org/2000/svg';for(const c of connectors){const a=nodes.find(n=>n.id===c.from),b=nodes.find(n=>n.id===c.to);if(!a||!b)continue;const el=document.createElementNS(ns,'path'),x1=a.x+a.w/2,y1=a.y+a.h/2,x2=b.x+b.w/2,y2=b.y+b.h/2;el.setAttribute('d',`M ${x1} ${y1} L ${x2} ${y2}`);el.setAttribute('stroke','#5d72a0');el.setAttribute('stroke-width','3');el.setAttribute('fill','none');el.setAttribute('marker-end','url(#arr)');lines.append(el)}for(const p of paths){if(!p.points||p.points.length<2)continue;const el=document.createElementNS(ns,'path');el.setAttribute('d',p.points.map((pt,i)=>`${i?'L':'M'}${pt.x} ${pt.y}`).join(' '));el.setAttribute('stroke',p.color||'#394c78');el.setAttribute('stroke-width',String(p.width||3));el.setAttribute('stroke-linecap','round');el.setAttribute('stroke-linejoin','round');el.setAttribute('fill','none');lines.append(el)}const defs=document.createElementNS(ns,'defs');defs.innerHTML='<marker id="arr" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#5d72a0"/></marker>';lines.prepend(defs)}
-function startNodeInteraction(e,n,kind){if(locked)return;if(e.button&&e.pointerType!=='touch')return;e.preventDefault();e.stopPropagation();selectNode(n.id);if(tool==='link')return;checkpoint();const point=toWorld(e.clientX,e.clientY);interaction={kind,id:n.id,start:point,x:n.x,y:n.y,w:n.w,h:n.h,changed:false};viewport.focus({preventScroll:true})}
-function pointerDown(e){if(e.button===2)return;const onNode=e.target.closest('.node');if(onNode)return;if(e.target.closest('.view-controls'))return;if(locked){interaction={kind:'pan',x:e.clientX,y:e.clientY,ox,oy};viewport.classList.add('panning');return;}const p=toWorld(e.clientX,e.clientY);if(tool==='pen'){checkpoint();const path={id:uid(),points:[p],color:'#344f81',width:3};paths.push(path);interaction={kind:'draw',path};return}if(['note','text','rect','ellipse'].includes(tool)){const n=addNode(tool,p.x-25,p.y-25);setTool('select');if(tool==='note'&&n){const el=$(`.node[data-id="${n.id}"] .node-text`);el?.focus()}return}if(tool==='link'){selectNode(null);return}if(tool==='hand'||spaceHeld||e.button===1){interaction={kind:'pan',x:e.clientX,y:e.clientY,ox,oy};viewport.classList.add('panning')}else{selectNode(null);interaction={kind:'pan',x:e.clientX,y:e.clientY,ox,oy};viewport.classList.add('panning')}}
-function pointerMove(e){if(!interaction)return;let d=interaction;if(locked&&d.kind!=='pan')return;if(d.kind==='pan'){ox=d.ox+e.clientX-d.x;oy=d.oy+e.clientY-d.y;updateCamera();return}if(d.kind==='draw'){d.path.points.push(toWorld(e.clientX,e.clientY));drawLines();return}const n=nodes.find(n=>n.id===d.id);if(!n)return;const p=toWorld(e.clientX,e.clientY),dx=p.x-d.start.x,dy=p.y-d.start.y;if(d.kind==='move'){n.x=Math.round(d.x+dx);n.y=Math.round(d.y+dy)}else if(d.kind==='resize'){n.w=Math.max(110,Math.round(d.w+dx));n.h=Math.max(70,Math.round(d.h+dy));$('#node-width').value=Math.min(900,n.w);$('#width-label').textContent=`${n.w} px`}let el=$(`.node[data-id="${n.id}"]`);if(el){el.style.left=n.x+'px';el.style.top=n.y+'px';el.style.width=n.w+'px';el.style.height=n.h+'px'}drawLines()}
-function pointerUp(){if(!interaction)return;viewport.classList.remove('panning');interaction=null;scheduleSave()}
+function startNodeInteraction(e,n,kind){
+ if(locked||touchGestureConsumed||pinch||activeTouches.size>1)return;
+ if(e.button&&e.pointerType!=='touch')return;
+ e.preventDefault();e.stopPropagation();selectNode(n.id);
+ if(tool==='link')return;
+ const point=toWorld(e.clientX,e.clientY),isTouch=e.pointerType==='touch';
+ if(!isTouch)checkpoint();
+ interaction={kind,id:n.id,start:point,x:n.x,y:n.y,w:n.w,h:n.h,changed:false,pointerId:e.pointerId,
+ isTouch,checkpointed:!isTouch,startClientX:e.clientX,startClientY:e.clientY,startedAt:performance.now(),
+ previousFuture:isTouch?future.slice():null};
+ viewport.focus({preventScroll:true});
+}
+
+function pointerDown(e){
+ if(e.button===2||touchGestureConsumed||pinch||(e.pointerType==='touch'&&activeTouches.size>1))return;
+ if(e.target.closest('.node')||e.target.closest('.view-controls'))return;
+ const isTouch=e.pointerType==='touch';
+ if(locked){interaction={kind:'pan',x:e.clientX,y:e.clientY,ox,oy,pointerId:e.pointerId,isTouch};viewport.classList.add('panning');return}
+ const p=toWorld(e.clientX,e.clientY);
+ if(tool==='pen'){
+  if(isTouch){interaction={kind:'pending-draw',pointerId:e.pointerId,start:p,startX:e.clientX,startY:e.clientY};return}
+  checkpoint();const path={id:uid(),points:[p],color:'#344f81',width:3};paths.push(path);interaction={kind:'draw',path,pointerId:e.pointerId,checkpointed:true};return
+ }
+ if(['note','text','rect','ellipse'].includes(tool)){
+  if(isTouch){interaction={kind:'pending-create',pointerId:e.pointerId,createTool:tool,point:p};return}
+  const n=addNode(tool,p.x-25,p.y-25);setTool('select');
+  if(n?.type==='note')$(
+   `.node[data-id="${n.id}"] .node-text`)?.focus();
+  return
+ }
+ if(tool==='link'){selectNode(null);return}
+ if(tool!=='hand'&&!spaceHeld&&e.button!==1)selectNode(null);
+ interaction={kind:'pan',x:e.clientX,y:e.clientY,ox,oy,pointerId:e.pointerId,isTouch};
+ viewport.classList.add('panning');
+}
+
+function pointerMove(e){
+ if(!interaction||touchGestureConsumed||pinch)return;
+ const d=interaction;
+ if(d.pointerId!=null&&e.pointerId!==d.pointerId)return;
+ if(locked&&d.kind!=='pan')return;
+ if(d.kind==='pan'){ox=d.ox+e.clientX-d.x;oy=d.oy+e.clientY-d.y;updateCamera();return}
+ if(d.kind==='pending-create'||d.kind==='pending-link')return;
+ if(d.kind==='pending-draw'){
+  if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<10)return;
+  checkpoint();const path={id:uid(),points:[d.start,toWorld(e.clientX,e.clientY)],color:'#344f81',width:3};
+  paths.push(path);interaction={kind:'draw',path,pointerId:e.pointerId,checkpointed:true};drawLines();return
+ }
+ if(d.kind==='draw'){d.path.points.push(toWorld(e.clientX,e.clientY));drawLines();return}
+ const n=nodes.find(n=>n.id===d.id);if(!n)return;
+ if(d.isTouch&&!d.checkpointed){
+  const distance=Math.hypot(e.clientX-d.startClientX,e.clientY-d.startClientY);
+  if(distance<12||(performance.now()-d.startedAt<90&&distance<30))return;
+  checkpoint();d.checkpointed=true;
+ }
+ const p=toWorld(e.clientX,e.clientY),dx=p.x-d.start.x,dy=p.y-d.start.y;
+ if(d.kind==='move'){n.x=Math.round(d.x+dx);n.y=Math.round(d.y+dy)}
+ else if(d.kind==='resize'){n.w=Math.max(110,Math.round(d.w+dx));n.h=Math.max(70,Math.round(d.h+dy));$('#node-width').value=Math.min(900,n.w);$('#width-label').textContent=`${n.w} px`}
+ const el=$(`.node[data-id="${n.id}"]`);
+ if(el){el.style.left=n.x+'px';el.style.top=n.y+'px';el.style.width=n.w+'px';el.style.height=n.h+'px'}
+ drawLines()
+}
+
+function pointerUp(e){
+ if(!interaction)return;
+ const d=interaction;
+ if(d.pointerId!=null&&e.pointerId!==d.pointerId)return;
+ interaction=null;viewport.classList.remove('panning');
+ if(touchGestureConsumed||pinch)return;
+ if(d.kind==='pending-create'&&!locked){
+  const n=addNode(d.createTool,d.point.x-25,d.point.y-25);
+  if(n){setTool('select');if(n.type==='note')$(
+   `.node[data-id="${n.id}"] .node-text`)?.focus()}
+  return
+ }
+ if(d.kind==='pending-link'&&!locked){completeNodeLink(d.id);return}
+ if(d.kind==='pending-draw')return;
+ scheduleSave()
+}
 function deleteSelected(){if(locked||!selected)return;checkpoint();nodes=nodes.filter(n=>n.id!==selected);connectors=connectors.filter(c=>c.from!==selected&&c.to!==selected);selected=null;render();scheduleSave()}
 function duplicateSelected(){if(locked)return;const n=nodes.find(n=>n.id===selected);if(!n)return;const copy=JSON.parse(JSON.stringify(n));copy.id=uid();copy.x+=35;copy.y+=35;checkpoint();nodes.push(copy);render();selectNode(copy.id);scheduleSave()}
 function downloadData(src,name){let a=document.createElement('a');a.href=src;a.download=name;a.rel='noopener noreferrer';document.body.append(a);a.click();a.remove()}
@@ -183,8 +270,72 @@ viewport.addEventListener('wheel',e=>{if(e.target.closest('.node-text'))return;e
 window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,[contenteditable]'))return;const mod=e.ctrlKey||e.metaKey;if(locked){if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject()}else if(e.key==='Delete'||e.key==='Backspace'||(mod&&['z','y','d'].includes(e.key.toLowerCase())))e.preventDefault();return;}if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return}if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject();return}if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected();return}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();return}if(e.key==='Escape'){setToolsOpen(false);selected=null;selectNode(null);setTool('select');return}if(e.code==='Space'){spaceHeld=true;viewport.classList.add('hand');e.preventDefault();return}const short={v:'select',h:'hand',n:'note',t:'text',r:'rect',o:'ellipse',p:'pen',l:'link'};if(!mod&&short[e.key.toLowerCase()])setTool(short[e.key.toLowerCase()])});window.addEventListener('keyup',e=>{if(e.code==='Space'){spaceHeld=false;viewport.classList.toggle('hand',tool==='hand')}});
 viewport.addEventListener('dragenter',e=>{e.preventDefault();document.body.classList.add('dragging-files')});viewport.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy'});viewport.addEventListener('dragleave',e=>{if(!viewport.contains(e.relatedTarget))document.body.classList.remove('dragging-files')});viewport.addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('dragging-files');if(locked){toast('Destrave o quadro para importar arquivos.');return;}importFiles(e.dataTransfer.files,toWorld(e.clientX,e.clientY))});
 window.addEventListener('beforeunload',()=>{if(saveTimer)clearTimeout(saveTimer)});
-// Gestos de pinça em telas sensíveis ao toque.
-const activeTouches=new Map();let pinch=null;viewport.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch')return;activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(activeTouches.size===2){const pts=[...activeTouches.values()];pinch={distance:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y),zoom};interaction=null}},{capture:true});viewport.addEventListener('pointermove',e=>{if(!activeTouches.has(e.pointerId))return;activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pinch&&activeTouches.size===2){let pts=[...activeTouches.values()],dist=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y),center={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};zoomAt((pinch.zoom*Math.max(.1,dist)/Math.max(1,pinch.distance))/zoom,center.x,center.y)}} ,{capture:true});const touchEnd=e=>{activeTouches.delete(e.pointerId);if(activeTouches.size<2)pinch=null};viewport.addEventListener('pointerup',touchEnd,{capture:true});viewport.addEventListener('pointercancel',touchEnd,{capture:true});
+// Pinça estável: amortecimento, zona neutra e âncora fixa no ponto entre os dedos.
+function cancelInteractionForPinch(){
+ const d=interaction;interaction=null;viewport.classList.remove('panning');
+ if(!d)return;
+ if((d.kind==='move'||d.kind==='resize')&&d.isTouch){
+  const n=nodes.find(n=>n.id===d.id);if(n){n.x=d.x;n.y=d.y;n.w=d.w;n.h=d.h}
+  if(d.checkpointed){history.pop();future=d.previousFuture||[];updateUndoButtons()}
+  render();
+ }else if(d.kind==='draw'&&d.path){
+  paths=paths.filter(p=>p.id!==d.path.id);
+  if(d.checkpointed){history.pop();updateUndoButtons()}
+  drawLines();
+ }else if(d.kind==='pan'&&d.isTouch){
+  ox=d.ox;oy=d.oy;updateCamera();
+ }
+}
+function pinchPoints(){
+ const a=[...activeTouches.values()];if(a.length!==2)return null;
+ return {distance:Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),
+  x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2}
+}
+function beginPinch(){
+ const pts=pinchPoints();if(!pts||pts.distance<12)return;
+ cancelInteractionForPinch();touchGestureConsumed=true;
+ const rect=viewport.getBoundingClientRect();
+ const sx=pts.x-rect.left,sy=pts.y-rect.top;
+ pinch={startDistance:pts.distance,startZoom:zoom,startX:sx,startY:sy,
+  anchorX:(sx-ox)/zoom,anchorY:(sy-oy)/zoom,smoothX:sx,smoothY:sy};
+ viewport.classList.add('pinching');
+}
+function updatePinch(){
+ if(!pinch)return;
+ const pts=pinchPoints();if(!pts)return;
+ const rect=viewport.getBoundingClientRect(),cx=pts.x-rect.left,cy=pts.y-rect.top;
+ const logRatio=Math.log(Math.max(12,pts.distance)/pinch.startDistance);
+ const cleanLog=Math.sign(logRatio)*Math.max(0,Math.abs(logRatio)-0.025);
+ const targetZoom=Math.max(.2,Math.min(4,pinch.startZoom*Math.exp(cleanLog*.70)));
+ zoom+=(targetZoom-zoom)*.40;
+ const dx=cx-pinch.startX,dy=cy-pinch.startY;
+ const deadzone=v=>Math.abs(v)<5?0:v-Math.sign(v)*5;
+ const targetX=pinch.startX+deadzone(dx),targetY=pinch.startY+deadzone(dy);
+ pinch.smoothX+=(targetX-pinch.smoothX)*.38;
+ pinch.smoothY+=(targetY-pinch.smoothY)*.38;
+ ox=pinch.smoothX-pinch.anchorX*zoom;
+ oy=pinch.smoothY-pinch.anchorY*zoom;
+ updateCamera();scheduleSave();
+}
+viewport.addEventListener('pointerdown',e=>{
+ if(e.pointerType!=='touch')return;
+ activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(activeTouches.size===2){beginPinch();e.preventDefault()}
+ else if(activeTouches.size>2){touchGestureConsumed=true;cancelInteractionForPinch()}
+},{capture:true});
+viewport.addEventListener('pointermove',e=>{
+ if(e.pointerType!=='touch'||!activeTouches.has(e.pointerId))return;
+ activeTouches.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pinch&&activeTouches.size===2){e.preventDefault();updatePinch()}
+},{capture:true});
+function finishTouch(e){
+ if(e.pointerType!=='touch')return;
+ activeTouches.delete(e.pointerId);
+ if(activeTouches.size<2){pinch=null;viewport.classList.remove('pinching')}
+ if(activeTouches.size===0)touchGestureConsumed=false;
+}
+viewport.addEventListener('pointerup',finishTouch,{capture:true});
+viewport.addEventListener('pointercancel',finishTouch,{capture:true});
 // Exportação de PNG via botão adicional, mantida independente do salvamento do projeto.
 const pngButton=document.createElement('button');pngButton.id='export-png';pngButton.className='secondary';pngButton.textContent='PNG';pngButton.title='Exportar imagem';pngButton.onclick=exportPng;$('#export-file').before(pngButton);
 init();
