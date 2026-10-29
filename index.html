@@ -269,6 +269,44 @@ body.styles-open #inspector{display:none}
 .node.template .tree-card.root .branch-detail{font-size:calc(var(--ql-font-size,16px)*.68)}
 .node.template .timeline-label input[type=text]{font-size:calc(var(--ql-font-size,16px)*.82);color:var(--ql-font-color,#243047)}
 .node.template .agenda-event{font-size:calc(var(--ql-font-size,16px)*.70)}
+
+/* Quadro Livre 1.8: cartões de organograma editáveis individualmente */
+.branch-editor{position:absolute;top:84px;right:14px;bottom:12px;width:min(340px,calc(100vw - 26px));z-index:27;background:#fff;border:1px solid #dce4f1;border-radius:17px;box-shadow:0 14px 48px #1d2a4038;padding:17px;overflow:auto}
+.branch-editor[hidden]{display:none}
+body.branch-editor-open #inspector{display:none}
+.branch-editor-head{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e5ebf3;padding-bottom:9px;margin-bottom:9px}
+.branch-editor label{font-size:12px;color:#536481;display:block;margin:10px 0 6px}
+.branch-editor input[type=text],.branch-editor input[type=url],.branch-editor textarea{width:100%;font:inherit;font-size:13px;background:#fff;border:1px solid #d5dfed;padding:9px;border-radius:9px;color:#263954}
+.branch-editor textarea{resize:vertical;line-height:1.4;min-height:68px}
+.branch-editor input[type=range]{width:100%;accent-color:#526feb}
+.branch-editor-help{font-size:11px;color:#78869a;line-height:1.5;margin:9px 0}
+.branch-editor-duo{display:flex;gap:14px}.branch-editor-duo label{flex:1}.branch-editor-duo input{display:block;margin-top:7px;width:54px;height:34px}
+.branch-extra-head{margin:20px 0 10px;border-top:1px solid #e9edf5;padding-top:13px;display:flex;flex-direction:column;gap:9px}
+.branch-extra-head strong{font-size:12px;color:#344661}
+.branch-extra-head div{display:flex;flex-wrap:wrap;gap:5px}
+.branch-extra-head button,.branch-extra-item button{border:1px solid #d7e0f1;border-radius:8px;color:#4767a6;background:#fff;padding:7px;font-size:11px}
+.branch-extra-list{display:flex;flex-direction:column;gap:10px}
+.branch-extra-item{padding:10px;border:1px solid #e1e8f2;background:#f8faff;border-radius:11px;display:flex;flex-direction:column;gap:8px}
+.branch-extra-item header{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#52617b}
+.branch-extra-item header button{font-size:17px;border:0;background:none;color:#b94b61}
+.branch-extra-item textarea{min-height:80px}
+.tree-card{width:245px;min-height:96px;max-height:390px;overflow:auto;justify-content:flex-start;padding:13px 14px;scrollbar-width:thin}
+.tree-card.root{width:250px}
+.tree-card .branch-label{font-size:var(--branch-size,14px);color:inherit;min-height:20px;padding-right:18px;line-height:1.32}
+.tree-card .branch-detail{font-size:calc(var(--branch-size,14px) * .88);color:inherit;opacity:.82;min-height:22px;margin-top:7px;white-space:pre-wrap;line-height:1.4}
+.tree-card .branch-label:empty::before{content:"Título";opacity:.5}
+.tree-card .branch-detail:empty::before{content:"Adicione uma descrição";opacity:.4}
+.tree-card .branch-body{display:flex;flex-direction:column;gap:8px;margin-top:9px}
+.tree-card .branch-note{padding:8px;background:#ffffff40;border:1px solid #7b8ca326;border-radius:8px;font-size:calc(var(--branch-size,14px) * .84);white-space:pre-wrap;overflow-wrap:anywhere;min-height:22px;line-height:1.42;outline:none}
+.tree-card .branch-hyperlink,.tree-card .branch-attachment{font-size:calc(var(--branch-size,14px) * .8);line-height:1.3;color:inherit;display:flex;align-items:center;gap:5px;overflow-wrap:anywhere;padding:7px 6px;border:1px solid #7b8ca331;border-radius:7px;background:#ffffff3a;text-decoration:underline;cursor:pointer}
+.tree-card .branch-image{width:100%;max-height:160px;object-fit:contain;border-radius:6px}
+.tree-card .branch-note:focus{outline:2px solid #7394ee}
+.tree-card .tree-actions{position:sticky;float:right;top:0;right:0;margin-top:-9px;margin-right:-10px;display:flex;gap:2px;background:#fffffff2;padding:2px;border-radius:9px;width:max-content;z-index:2}
+.tree-card .tree-actions button{border-radius:7px;width:24px;height:24px}
+.tree-card .tree-actions .tree-edit{font-size:13px;width:27px}
+.tree-card.active-branch{outline:3px solid #698af3;outline-offset:2px}
+.tree-card .branch-attachment:focus-visible{outline:2px solid #5277e8}
+@media(max-width:760px){.branch-editor{top:70px;right:7px;bottom:8px;width:min(330px,calc(100vw - 14px))}.tree-card{max-height:320px}}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -359,7 +397,20 @@ body.styles-open #inspector{display:none}
     <div class="style-section"><strong>Fundo do quadro</strong><div id="style-bg-swatches" class="styles-swatches"></div><div class="style-pair"><input type="color" id="style-bg-color" value="#f6f8fc" aria-label="Cor de fundo do quadro"><span id="style-bg-hex">#F6F8FC</span></div><label class="style-checkbox"><input type="checkbox" id="style-show-grid" checked> Mostrar grade de pontos</label></div>
     <p class="styles-footnote">As cores do quadro ficam salvas nesta pasta e no backup. Post-its existentes não são alterados ao trocar de paleta, a menos que você peça.</p>
   </aside>
-  <aside id="inspector" class="inspector" hidden>
+  <aside id="branch-editor" class="branch-editor" hidden aria-label="Editar subtópico do organograma ou mapa mental">
+  <div class="branch-editor-head"><strong>Editar subtópico</strong><button type="button" id="branch-editor-close" class="icon-button" aria-label="Fechar editor">×</button></div>
+  <p class="branch-editor-help">Edite cada quadro separadamente. O conteúdo fica dentro do próprio subtópico.</p>
+  <label for="branch-edit-title">Título</label><input id="branch-edit-title" type="text" placeholder="Título ou cargo" maxlength="240">
+  <label for="branch-edit-detail">Descrição e informações</label><textarea id="branch-edit-detail" rows="4" placeholder="Escreva aqui as informações deste subtópico"></textarea>
+  <div class="branch-editor-duo"><label>Fundo<input type="color" id="branch-edit-bg" value="#ffffff"></label><label>Texto<input type="color" id="branch-edit-fg" value="#243047"></label></div>
+  <label for="branch-edit-font-size">Tamanho da fonte <output id="branch-edit-size-out">14 px</output></label><input type="range" id="branch-edit-font-size" min="10" max="26" step="1" value="14">
+  <label for="branch-edit-width">Largura do quadro <output id="branch-edit-width-out">240 px</output></label><input type="range" id="branch-edit-width" min="200" max="360" step="10" value="240">
+  <div class="branch-extra-head"><strong>Conteúdo adicional</strong><div><button type="button" id="branch-add-note">+ Texto</button><button type="button" id="branch-add-link">+ Link</button><button type="button" id="branch-add-file">+ Arquivo</button></div></div>
+  <div id="branch-extra-list" class="branch-extra-list"></div>
+  <input id="branch-file-picker" type="file" multiple hidden>
+  <p class="branch-editor-help">Adicione textos, imagens, PDFs, documentos e hyperlinks dentro de cada quadro. Os anexos ficam neste navegador e entram no backup ZIP.</p>
+ </aside>
+ <aside id="inspector" class="inspector" hidden>
     <div class="inspector-head"><strong>Propriedades</strong><button id="close-inspector" class="icon-button" aria-label="Fechar">×</button></div>
     <label>Cor do elemento <input type="color" id="node-color" value="#fff1b8"></label>
     <label>Largura <input type="range" id="node-width" min="120" max="900" value="280"><output id="width-label">280 px</output></label>
