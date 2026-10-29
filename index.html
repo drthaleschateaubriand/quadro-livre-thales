@@ -1500,12 +1500,76 @@ function startNodeInteraction(e,n,kind){
  viewport.focus({preventScroll:true});
 }
 
+
+/* Borracha real: remove apenas os pontos da linha atingidos, dividindo o
+   traço se necessário. Não altera os demais objetos nem os documentos. */
+function distanceToSegment(px,py,a,b){
+ const dx=b.x-a.x,dy=b.y-a.y;
+ const den=dx*dx+dy*dy||1;
+ const t=Math.max(0,Math.min(1,((px-a.x)*dx+(py-a.y)*dy)/den));
+ return Math.hypot(px-(a.x+t*dx),py-(a.y+t*dy));
+}
+function eraseAt(center,gesture){
+ if(locked||!paths.length)return;
+ const radius=brush.eraserSize/2,remaining=[];
+ let anyChanged=false;
+ for(const path of paths){
+  const pts=path.points||[];
+  const tolerance=radius+(path.width||3)*.45;
+  if(pts.length<2){remaining.push(path);continue}
+  let hit=false;
+  for(let i=1;i<pts.length;i++){
+   if(distanceToSegment(center.x,center.y,pts[i-1],pts[i])<=tolerance){hit=true;break}
+  }
+  if(!hit){remaining.push(path);continue}
+  if(!gesture.checkpointed){checkpoint();gesture.checkpointed=true}
+  anyChanged=true;
+  const chunks=[];let piece=[];
+  const addPiece=()=>{
+   if(piece.length>=2)chunks.push(piece);
+   piece=[];
+  };
+  for(let i=1;i<pts.length;i++){
+   const a=pts[i-1],b=pts[i];
+   const length=Math.hypot(b.x-a.x,b.y-a.y);
+   const steps=Math.max(1,Math.ceil(length/Math.max(2,Math.min(5,radius/2))));
+   const start=i===1?0:1;
+   for(let j=start;j<=steps;j++){
+    const t=j/steps,pt={x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t};
+    const outside=Math.hypot(pt.x-center.x,pt.y-center.y)>tolerance;
+    if(outside){piece.push(pt)}
+    else addPiece();
+   }
+  }
+  addPiece();
+  for(const segment of chunks)remaining.push({...path,id:uid(),points:segment});
+ }
+ if(anyChanged){paths=remaining;gesture.changed=true;drawLines()}
+}
+function eraseAlong(from,to,gesture){
+ const dx=to.x-from.x,dy=to.y-from.y,span=Math.hypot(dx,dy);
+ const steps=Math.min(48,Math.max(1,Math.ceil(span/Math.max(3,brush.eraserSize*.3))));
+ for(let i=1;i<=steps;i++){
+  eraseAt({x:from.x+dx*i/steps,y:from.y+dy*i/steps},gesture);
+ }
+ gesture.last=to;
+}
+
 function pointerDown(e){
  if(e.button===2||touchGestureConsumed||pinch||(e.pointerType==='touch'&&activeTouches.size>1))return;
  if(e.target.closest('.node')||e.target.closest('.view-controls'))return;
  const isTouch=e.pointerType==='touch';
  if(locked){interaction={kind:'pan',x:e.clientX,y:e.clientY,ox,oy,pointerId:e.pointerId,isTouch};viewport.classList.add('panning');return}
  const p=toWorld(e.clientX,e.clientY);
+ if(tool==='eraser'){
+  if(isTouch){
+   interaction={kind:'pending-erase',pointerId:e.pointerId,start:p,last:p,startX:e.clientX,startY:e.clientY,changed:false,checkpointed:false,previousFuture:future.slice()};
+  }else{
+   interaction={kind:'erase',pointerId:e.pointerId,last:p,changed:false,checkpointed:false};
+   eraseAt(p,interaction);
+  }
+  return;
+ }
  if(tool==='arrow'||tool==='curved-arrow'){
   if(isTouch){interaction={kind:'pending-arrow',start:p,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,curve:tool==='curved-arrow'?115:0};return}
   checkpoint();const a={id:uid(),x1:p.x,y1:p.y,x2:p.x+1,y2:p.y+1,color:'#394c78',width:3};
@@ -1535,6 +1599,12 @@ function pointerMove(e){
  if(locked&&d.kind!=='pan')return;
  if(d.kind==='pan'){ox=d.ox+e.clientX-d.x;oy=d.oy+e.clientY-d.y;updateCamera();return}
  if(d.kind==='pending-create'||d.kind==='pending-link')return;
+ if(d.kind==='pending-erase'){
+  if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<10)return;
+  const p=toWorld(e.clientX,e.clientY);
+  interaction={...d,kind:'erase'};eraseAlong(d.start,p,interaction);return;
+ }
+ if(d.kind==='erase'){eraseAlong(d.last,toWorld(e.clientX,e.clientY),d);return}
  if(d.kind==='pending-arrow'){
   if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<10)return;
   checkpoint();const a={id:uid(),x1:d.start.x,y1:d.start.y,x2:d.start.x+1,y2:d.start.y+1,color:'#394c78',width:3};
@@ -1581,6 +1651,8 @@ function pointerUp(e){
  interaction=null;viewport.classList.remove('panning');
  if(viewport.hasPointerCapture?.(e.pointerId))viewport.releasePointerCapture(e.pointerId);
  if(touchGestureConsumed||pinch)return;
+ if(d.kind==='pending-erase'&&!locked){eraseAt(d.start,d);if(d.changed)scheduleSave();return}
+ if(d.kind==='erase'){if(d.changed)scheduleSave();return}
  if(d.kind==='pending-create'&&!locked){
   const n=addNode(d.createTool,d.point.x-25,d.point.y-25);
   if(n){setTool('select');if(n.type==='note')$(
@@ -1719,6 +1791,10 @@ function cancelInteractionForPinch(){
    else {a.x1=d.x1;a.y1=d.y1;a.x2=d.x2;a.y2=d.y2;a.curve=d.curve}}
   if(d.checkpointed){history.pop();future=d.previousFuture||[];updateUndoButtons()}
   drawLines();
+ }else if(d.kind==='erase'&&d.isTouch&&d.checkpointed){
+  const old=history.pop();
+  if(old)restoreSnapshot(old);
+  future=d.previousFuture||[];updateUndoButtons();
  }else if(d.kind==='draw'&&d.path){
   paths=paths.filter(p=>p.id!==d.path.id);
   if(d.checkpointed){history.pop();updateUndoButtons()}
