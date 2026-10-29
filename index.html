@@ -471,7 +471,7 @@
   <details id="context-more" class="context-more">
    <summary title="Mais opções" aria-label="Mais opções">⋯</summary>
    <div class="context-menu">
-    <button id="context-edit-text" type="button" hidden>Editar texto</button>
+    <button id="context-edit-text" type="button" hidden>Editar texto (celular)</button>
     <button id="context-duplicate" type="button">Duplicar elemento</button>
     <button id="context-link" type="button">Adicionar hyperlink</button>
     <button id="context-curvature" type="button" hidden>Curvatura da seta</button>
@@ -1582,7 +1582,9 @@ function drawLines(){
 function startNodeInteraction(e,n,kind){
  if(locked||touchGestureConsumed||pinch||activeTouches.size>1)return;
  if(e.button&&e.pointerType!=='touch')return;
- e.preventDefault();e.stopPropagation();selectNode(n.id);
+ e.preventDefault();e.stopPropagation();
+ if(mobileEditingNodeId&&mobileEditingNodeId!==n.id)setMobileEdit(mobileEditingNodeId,false);
+ selectNode(n.id);
  if(tool==='link')return;
  const point=toWorld(e.clientX,e.clientY),isTouch=e.pointerType==='touch';
  if(!isTouch)checkpoint();
@@ -1733,7 +1735,7 @@ function pointerMove(e){
  else if(d.kind==='resize'){n.w=Math.max(110,Math.round(d.w+dx));n.h=Math.max(70,Math.round(d.h+dy));$('#node-width').value=Math.min(900,n.w);$('#width-label').textContent=`${n.w} px`}
  const el=$(`.node[data-id="${n.id}"]`);
  if(el){el.style.left=n.x+'px';el.style.top=n.y+'px';el.style.width=n.w+'px';el.style.height=n.h+'px'}
- drawLines()
+ drawLines();requestAnimationFrame(placeContextToolbar)
 }
 
 function pointerUp(e){
