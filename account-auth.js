@@ -105,7 +105,7 @@
  $('#account-refresh').addEventListener('click',async()=>{
   if(!currentUser)return;
   try{await currentUser.reload();currentUser=auth.currentUser;await currentUser?.getIdToken(true);
-   render();note(currentUser?.emailVerified?'E-mail confirmado.':'Ainda não confirmado. Verifique o link enviado.');
+   render();window.dispatchEvent(new Event('quadro:auth-changed'));note(currentUser?.emailVerified?'E-mail confirmado.':'Ainda não confirmado. Verifique o link enviado.');
   }catch(err){note(errorText(err),true)}
  });
  $('#account-signout').addEventListener('click',async()=>{
