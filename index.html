@@ -10,7 +10,53 @@
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
-  <script defer>/* Quadro Livre v1.0.0 - editor de quadro infinito, sem servidor e sem rastreamento */
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><div class="brand-icon">Q</div><div><strong>Quadro Livre</strong><small>Seu espaço de ideias</small></div></div>
+    <div class="docinfo"><input aria-label="Nome do quadro" id="board-title" value="Meu primeiro quadro" maxlength="90"><span id="save-status">Pronto para editar</span></div>
+    <div class="top-actions">
+      <button class="secondary compact" data-action="undo" title="Desfazer (Ctrl+Z)" aria-label="Desfazer">↶</button>
+      <button class="secondary compact" data-action="redo" title="Refazer (Ctrl+Y)" aria-label="Refazer">↷</button>
+      <button class="secondary" id="import-file"><span>＋</span> Importar</button>
+      <button class="primary" id="export-file">Salvar arquivo</button>
+    </div>
+  </header>
+  <aside class="rail" aria-label="Ferramentas">
+    <button class="tool active" data-tool="select" title="Selecionar e mover (V)"><span>↖</span><small>Selecionar</small></button>
+    <button class="tool" data-tool="hand" title="Mover quadro (H)"><span>✋</span><small>Mão</small></button>
+    <button class="tool" data-tool="note" title="Criar nota (N)"><span>▤</span><small>Nota</small></button>
+    <button class="tool" data-tool="text" title="Criar texto (T)"><span>Ｔ</span><small>Texto</small></button>
+    <button class="tool" data-tool="rect" title="Retângulo (R)"><span>▭</span><small>Forma</small></button>
+    <button class="tool" data-tool="ellipse" title="Círculo (O)"><span>◯</span><small>Círculo</small></button>
+    <button class="tool" data-tool="pen" title="Desenhar (P)"><span>✎</span><small>Caneta</small></button>
+    <button class="tool" data-tool="link" title="Conectar dois cartões (L)"><span>↗</span><small>Ligar</small></button>
+    <div class="rail-sep"></div>
+    <button class="tool" id="insert-files" title="Importar arquivos"><span>▣</span><small>Arquivo</small></button>
+  </aside>
+  <main id="viewport" aria-label="Quadro infinito" tabindex="0">
+    <div id="grid"></div>
+    <div id="world"><svg id="lines" xmlns="http://www.w3.org/2000/svg"></svg><div id="nodes"></div></div>
+    <div id="empty-hint" class="hint"><strong>Um espaço inteiro para suas ideias.</strong><span>Arraste arquivos para cá ou use a barra lateral para começar.</span><button class="primary" id="start-note">Criar minha primeira nota</button></div>
+    <div class="view-controls">
+      <button class="secondary compact" id="zoom-out" aria-label="Reduzir zoom">−</button>
+      <button class="secondary zoom-indicator" id="zoom-reset" title="Restaurar 100%">100%</button>
+      <button class="secondary compact" id="zoom-in" aria-label="Ampliar zoom">＋</button>
+      <button class="secondary" id="fit-view" title="Enquadrar os elementos">Enquadrar</button>
+    </div>
+    <div id="drop-hint">Solte seus arquivos para inserir no quadro</div>
+  </main>
+  <aside id="inspector" class="inspector" hidden>
+    <div class="inspector-head"><strong>Propriedades</strong><button id="close-inspector" class="icon-button" aria-label="Fechar">×</button></div>
+    <label>Cor do elemento <input type="color" id="node-color" value="#fff1b8"></label>
+    <label>Largura <input type="range" id="node-width" min="120" max="900" value="280"><output id="width-label">280 px</output></label>
+    <div class="inspector-actions"><button class="secondary" id="duplicate-node">Duplicar</button><button class="danger" id="delete-node">Excluir</button></div>
+  </aside>
+  <div class="bottom-left"><span id="tool-label">Seleção</span><span class="separator">•</span><span id="count-label">0 elementos</span></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <input id="file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.json,.png,.jpg,.jpeg,.webp,.gif,.svg,.pptx,.xlsx,.csv,.html,*/*" hidden>
+  <dialog id="welcome-dialog"><div class="dialog-body"><div class="dialog-mark">Q</div><h2>Seu quadro está pronto</h2><p>Crie notas, mova elementos, importe documentos e organize tudo em um espaço infinito.</p><p class="privacy-note"><strong>Privacidade:</strong> nesta versão, o salvamento é feito no navegador deste dispositivo. Para usar o mesmo quadro em outro aparelho, exporte e importe o arquivo do projeto. A sincronização em nuvem ainda não está ativada.</p><button class="primary" id="welcome-close">Começar a criar</button></div></dialog>
+<script>/* Quadro Livre v1.0.0 - editor de quadro infinito, sem servidor e sem rastreamento */
 (() => {
 'use strict';
 const $ = (q, el=document) => el.querySelector(q);
@@ -86,51 +132,5 @@ const pngButton=document.createElement('button');pngButton.id='export-png';pngBu
 init();
 })();
 </script>
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand"><div class="brand-icon">Q</div><div><strong>Quadro Livre</strong><small>Seu espaço de ideias</small></div></div>
-    <div class="docinfo"><input aria-label="Nome do quadro" id="board-title" value="Meu primeiro quadro" maxlength="90"><span id="save-status">Pronto para editar</span></div>
-    <div class="top-actions">
-      <button class="secondary compact" data-action="undo" title="Desfazer (Ctrl+Z)" aria-label="Desfazer">↶</button>
-      <button class="secondary compact" data-action="redo" title="Refazer (Ctrl+Y)" aria-label="Refazer">↷</button>
-      <button class="secondary" id="import-file"><span>＋</span> Importar</button>
-      <button class="primary" id="export-file">Salvar arquivo</button>
-    </div>
-  </header>
-  <aside class="rail" aria-label="Ferramentas">
-    <button class="tool active" data-tool="select" title="Selecionar e mover (V)"><span>↖</span><small>Selecionar</small></button>
-    <button class="tool" data-tool="hand" title="Mover quadro (H)"><span>✋</span><small>Mão</small></button>
-    <button class="tool" data-tool="note" title="Criar nota (N)"><span>▤</span><small>Nota</small></button>
-    <button class="tool" data-tool="text" title="Criar texto (T)"><span>Ｔ</span><small>Texto</small></button>
-    <button class="tool" data-tool="rect" title="Retângulo (R)"><span>▭</span><small>Forma</small></button>
-    <button class="tool" data-tool="ellipse" title="Círculo (O)"><span>◯</span><small>Círculo</small></button>
-    <button class="tool" data-tool="pen" title="Desenhar (P)"><span>✎</span><small>Caneta</small></button>
-    <button class="tool" data-tool="link" title="Conectar dois cartões (L)"><span>↗</span><small>Ligar</small></button>
-    <div class="rail-sep"></div>
-    <button class="tool" id="insert-files" title="Importar arquivos"><span>▣</span><small>Arquivo</small></button>
-  </aside>
-  <main id="viewport" aria-label="Quadro infinito" tabindex="0">
-    <div id="grid"></div>
-    <div id="world"><svg id="lines" xmlns="http://www.w3.org/2000/svg"></svg><div id="nodes"></div></div>
-    <div id="empty-hint" class="hint"><strong>Um espaço inteiro para suas ideias.</strong><span>Arraste arquivos para cá ou use a barra lateral para começar.</span><button class="primary" id="start-note">Criar minha primeira nota</button></div>
-    <div class="view-controls">
-      <button class="secondary compact" id="zoom-out" aria-label="Reduzir zoom">−</button>
-      <button class="secondary zoom-indicator" id="zoom-reset" title="Restaurar 100%">100%</button>
-      <button class="secondary compact" id="zoom-in" aria-label="Ampliar zoom">＋</button>
-      <button class="secondary" id="fit-view" title="Enquadrar os elementos">Enquadrar</button>
-    </div>
-    <div id="drop-hint">Solte seus arquivos para inserir no quadro</div>
-  </main>
-  <aside id="inspector" class="inspector" hidden>
-    <div class="inspector-head"><strong>Propriedades</strong><button id="close-inspector" class="icon-button" aria-label="Fechar">×</button></div>
-    <label>Cor do elemento <input type="color" id="node-color" value="#fff1b8"></label>
-    <label>Largura <input type="range" id="node-width" min="120" max="900" value="280"><output id="width-label">280 px</output></label>
-    <div class="inspector-actions"><button class="secondary" id="duplicate-node">Duplicar</button><button class="danger" id="delete-node">Excluir</button></div>
-  </aside>
-  <div class="bottom-left"><span id="tool-label">Seleção</span><span class="separator">•</span><span id="count-label">0 elementos</span></div>
-  <div id="toast" role="status" aria-live="polite"></div>
-  <input id="file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.json,.png,.jpg,.jpeg,.webp,.gif,.svg,.pptx,.xlsx,.csv,.html,*/*" hidden>
-  <dialog id="welcome-dialog"><div class="dialog-body"><div class="dialog-mark">Q</div><h2>Seu quadro está pronto</h2><p>Crie notas, mova elementos, importe documentos e organize tudo em um espaço infinito.</p><p class="privacy-note"><strong>Privacidade:</strong> nesta versão, o salvamento é feito no navegador deste dispositivo. Para usar o mesmo quadro em outro aparelho, exporte e importe o arquivo do projeto. A sincronização em nuvem ainda não está ativada.</p><button class="primary" id="welcome-close">Começar a criar</button></div></dialog>
 </body>
 </html>
