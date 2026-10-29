@@ -73,3 +73,18 @@ test('Listagem Firestore apresenta apenas quadros válidos',async()=>{
   assert.equal(boards[0].id,'root');
  }finally{globalThis.fetch=old}
 });
+
+test('token inválido não permite ler quadros nem retorna conteúdo privado',async()=>{
+  const before=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({error:{message:'PERMISSION_DENIED'}}),{status:403,headers:{'content-type':'application/json'}});
+  try{
+    await assert.rejects(()=>readBoard({FIREBASE_PROJECT_ID:'p'},'victim','invalid-token','root'),/Acesso negado pelo Firebase/);
+  }finally{globalThis.fetch=before}
+});
+test('revisão antiga bloqueia a escrita sem substituir dados do outro dispositivo',async()=>{
+  const before=globalThis.fetch;
+  globalThis.fetch=async()=>new Response(JSON.stringify({error:{message:'FAILED_PRECONDITION'}}),{status:412,headers:{'content-type':'application/json'}});
+  try{
+    await assert.rejects(()=>saveBoard({FIREBASE_PROJECT_ID:'p'},'user','token','root',{nodes:[]},'2026-10-29T00:00:00Z'),/Reabra a versão atual/);
+  }finally{globalThis.fetch=before}
+});
