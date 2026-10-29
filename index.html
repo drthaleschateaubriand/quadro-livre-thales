@@ -125,6 +125,24 @@
  .top-actions #board-lock{width:35px;min-width:35px}
  .folders-toggle,.creation-trigger,#tool-menu{min-width:32px;width:34px;padding:0 5px}
 }
+
+/* Templates estruturados do Quadro Livre 1.6 */
+.template-body.special-template{padding:12px 14px 16px}
+.special-header{display:flex;align-items:center;gap:10px;justify-content:space-between;margin-bottom:12px}
+.special-header .template-title{margin:0;font-size:20px;min-width:0;flex:1}
+.special-header button,.special-toolbar button{border:1px solid #d6e0f2;background:#fff;color:#34578f;border-radius:9px;font-size:12px;padding:7px 10px;cursor:pointer}
+.special-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.tree-surface{position:relative;overflow:auto;background:radial-gradient(#d5dcea 1px,transparent 1px);background-size:22px 22px;min-height:320px;border:1px solid #e4eaf6;border-radius:12px}
+.tree-surface svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.tree-card{position:absolute;width:162px;min-height:62px;border:1.5px solid #a9bdf1;border-radius:12px;background:#fff;box-shadow:0 4px 13px #283e7215;padding:8px 11px;display:flex;flex-direction:column;justify-content:center}
+.tree-card.root{background:#3659ad;color:#fff;border-color:#3659ad;width:185px}
+.tree-card .branch-label{font-weight:750;font-size:13px;line-height:1.3;outline:none;min-height:19px;white-space:pre-wrap;overflow-wrap:anywhere}
+.tree-card .branch-detail{font-size:11px;line-height:1.4;opacity:.7;min-height:16px;outline:none;white-space:pre-wrap;overflow-wrap:anywhere}
+.tree-card .branch-label:focus,.tree-card .branch-detail:focus{outline:2px solid #8aabff;outline-offset:2px}
+.tree-actions{display:flex;gap:3px;position:absolute;top:-11px;right:3px;z-index:2}
+.tree-actions button{border:1px solid #c6d5f1;background:#fff;color:#4c65b0;width:23px;height:23px;border-radius:50%;font-size:15px;line-height:20px;cursor:pointer}
+.tree-caption{font-size:11px;color:#7e8ba2}
+@media(max-width:760px){.tree-surface{min-height:290px}.special-header{flex-wrap:wrap}}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -168,9 +186,12 @@
   <div class="creation-heading">Adicionar ao quadro <button id="creation-close" class="icon-button" aria-label="Fechar">×</button></div>
   <div class="creation-options">
     <button data-template="prototype"><span style="color:#7965ff">▯</span>Protótipo</button>
+    <button data-template="mindmap"><span style="color:#7b63e6">✺</span>Mapa mental</button>
+    <button data-template="orgchart"><span style="color:#2679cc">♧</span>Organograma</button>
     <button data-template="diagram"><span style="color:#e68532">♧</span>Diagrama</button>
     <button data-template="table"><span style="color:#02ab52">▦</span>Tabelas</button>
-    <button data-template="timeline"><span style="color:#02ab52">≡</span>Timeline</button>
+    <button data-template="timeline"><span style="color:#02ab52">≡</span>Timeline visual</button>
+    <button data-template="agenda"><span style="color:#f1863a">▦</span>Agenda mensal</button>
     <button data-template="kanban"><span style="color:#02ab52">▤</span>Kanban</button>
     <button data-template="document"><span style="color:#08a7df">▤</span>Documento</button>
     <button data-template="slides"><span style="color:#ff5264">▣</span>Slides</button>
@@ -495,6 +516,9 @@ async function toggleRecording(nodeId){
  }catch(e){console.warn(e);toast('Não foi possível acessar o microfone.')}
 }
 const templateDefs={
+ mindmap:{title:'Mapa mental',items:[]},
+ orgchart:{title:'Organograma',items:[]},
+ agenda:{title:'Agenda de compromissos',items:[]},
  prototype:{title:'Protótipo de aplicativo',items:[['Tela inicial','Cabeçalho • imagem • botão principal'],['Tela de detalhes','Conteúdo, informações e ações'],['Navegação','Voltar • Próximo • Menu']]},
  table:{title:'Tabela de dados',items:[['Coluna A','Valor 1'],['Coluna B','Valor 2'],['Coluna C','Valor 3'],['Nova linha','Preencha uma nova informação']]},
  timeline:{title:'Timeline do projeto',items:[['Etapa 1 · Início','Objetivo e data'],['Etapa 2 · Desenvolvimento','Atividades e responsáveis'],['Etapa 3 · Conclusão','Entrega final']]},
@@ -541,11 +565,108 @@ $$('[data-template]').forEach(button=>button.addEventListener('click',()=>{
   for(const [a,b] of [[first,second],[second,third]])arrows.push({id:uid(),x1:a.x+a.w,y1:a.y+a.h/2,x2:b.x,y2:b.y+b.h/2,width:3,color:'#5874bc',curve:kind==='flows'?55:0});
   render();scheduleSave();
  }else{
-  addNode('template',p.x-350,p.y-210,{kind,titleText:def.title,items:def.items.map(x=>({id:uid(),label:x[0],detail:x[1]})),w:kind==='kanban'?800:kind==='timeline'?670:kind==='prototype'?660:720,h:420,color:'#ffffff'});
+  const model={kind,titleText:def.title,items:def.items.map(x=>({id:uid(),label:x[0],detail:x[1]})),w:kind==='kanban'?800:kind==='timeline'?1150:kind==='prototype'?660:720,h:420,color:'#ffffff'};
+  if(kind==='mindmap'||kind==='orgchart'){
+   const id=uid();
+   model.tree=[{id,parentId:null,label:kind==='mindmap'?'Tema principal':'Direção',detail:kind==='mindmap'?'Ideia central':'Responsável',side:'right'}];
+   for(const [i,txt] of (kind==='mindmap'?['Conceito A','Conceito B','Conceito C','Conceito D']:['Equipe 1','Equipe 2','Equipe 3']).entries())model.tree.push({id:uid(),parentId:id,label:txt,detail:kind==='mindmap'?'Explique a ideia':'Nome e função',side:i%2?'left':'right'});
+   model.w=kind==='mindmap'?1160:1120;model.h=580;
+  }
+  if(kind==='agenda'){model.w=920;model.h=690;model.events=[];model.month=localMonthString(new Date())}
+  if(kind==='slides'){model.w=840;model.h=580;model.slideIndex=0;model.items=model.items.map((a,i)=>({...a,layout:i===0?'title':i===1?'agenda':'two-columns'}))}
+  addNode('template',p.x-model.w/2,p.y-model.h/2,model);
  }
  closeCreateMenu();toast(def.title+' adicionado.');
 }));
+
+function makeEditableField(element,owner,key,nodeId){
+ let original='';
+ element.contentEditable=String(!locked);element.spellcheck=true;
+ element.addEventListener('focus',()=>{if(locked)return;original=snapshot();selectNode(nodeId)});
+ element.addEventListener('input',()=>{if(locked)return;owner[key]=element.innerText; scheduleSave()});
+ element.addEventListener('blur',()=>{if(!locked&&original&&original!==snapshot()){history.push(original);if(history.length>45)history.shift();future=[];updateUndoButtons()}});
+ return element
+}
+function specialHeader(n,body,controls){
+ const bar=document.createElement('div');bar.className='special-header';
+ const heading=document.createElement('div');heading.className='template-title';heading.textContent=n.titleText||'Novo quadro';
+ makeEditableField(heading,n,'titleText',n.id);bar.append(heading);
+ if(controls){const group=document.createElement('div');group.className='special-toolbar';
+ for(const entry of controls){const b=document.createElement('button');b.type='button';b.textContent=entry.label;b.disabled=!!(locked&&entry.edit);b.onclick=entry.action;b.addEventListener('pointerdown',e=>e.stopPropagation());group.append(b)}bar.append(group)}
+ body.append(bar)
+}
+function setTemplateSize(n,height){const el=$(`.node[data-id="${n.id}"]`);if(el&&height>n.h){n.h=height;el.style.height=height+'px';scheduleSave()}}
+function renderTreeTemplate(el,n){
+ const body=document.createElement('div');body.className='template-body special-template';
+ if(!Array.isArray(n.tree)||!n.tree.length){const id=uid();n.tree=[{id,parentId:null,label:n.kind==='orgchart'?'Direção':'Tema central',detail:'',side:'right'}]}
+ specialHeader(n,body,[{label:'＋ Novo ramo',edit:true,action:()=>{if(locked)return;const root=n.tree.find(t=>t.parentId===null);addBranch(root?.id)}}]);
+ const root=n.tree.find(t=>t.parentId===null)||n.tree[0],childrenOf=id=>n.tree.filter(t=>t.parentId===id);
+ function addBranch(parentId){
+  if(locked)return;const parent=n.tree.find(t=>t.id===parentId);if(!parent)return;
+  checkpoint();n.tree.push({id:uid(),parentId,label:n.kind==='mindmap'?'Novo ramo':'Novo cargo',detail:'Editar descrição',side:n.kind==='mindmap'?((childrenOf(root.id).length%2)?'left':'right'):'right'});
+  render();selectNode(n.id);scheduleSave();
+ }
+ function removeBranch(id){
+  if(locked||id===root.id)return;checkpoint();
+  const removes=new Set([id]);let changed=true;while(changed){changed=false;for(const item of n.tree)if(removes.has(item.parentId)&&!removes.has(item.id)){removes.add(item.id);changed=true}}
+  n.tree=n.tree.filter(x=>!removes.has(x.id));render();selectNode(n.id);scheduleSave()
+ }
+ const surface=document.createElement('div');surface.className='tree-surface';
+ const positions=new Map(),cardW=162,cardH=67;
+ let width=960,height=480;
+ if(n.kind==='mindmap'){
+  const xroot=485,spacingX=202,spacingY=92;
+  const branches=childrenOf(root.id);
+  const groups={left:branches.filter(x=>x.side==='left'),right:branches.filter(x=>x.side!=='left')};
+  function leaves(id){const c=childrenOf(id);return c.length?c.reduce((sum,b)=>sum+leaves(b.id),0):1}
+  const total=Math.max(4,...Object.values(groups).map(a=>a.reduce((sum,b)=>sum+leaves(b.id),0)));
+  height=Math.max(460,total*spacingY+120);
+  positions.set(root.id,{x:xroot,y:height/2-cardH/2});
+  function branchPlace(id,depth,side,min,max){
+   const y=(min+max)/2*spacingY+60;const x=xroot+(side==='left'?-1:1)*spacingX*depth-(side==='left'?0:0);
+   positions.set(id,{x,y});const childs=childrenOf(id);let index=min;
+   for(const item of childs){const length=leaves(item.id);branchPlace(item.id,depth+1,side,index,index+length);index+=length}
+  }
+  for(const side of ['left','right']){const group=groups[side];let cursor=(total-group.reduce((sum,b)=>sum+leaves(b.id),0))/2;for(const item of group){const length=leaves(item.id);branchPlace(item.id,1,side,cursor,cursor+length);cursor+=length}}
+  const leftMost=Math.min(...[...positions.values()].map(p=>p.x)),rightMost=Math.max(...[...positions.values()].map(p=>p.x+cardW));
+  const offset=leftMost<30?35-leftMost:0;for(const p of positions.values())p.x+=offset;
+  width=Math.max(980,rightMost+offset+45)
+ }else{
+  const col=204,row=112;const leaves=id=>{const c=childrenOf(id);return c.length?c.reduce((sum,b)=>sum+leaves(b.id),0):1};
+  const total=leaves(root.id);width=Math.max(900,total*col+120);
+  function orgPlace(id,depth,first){const own=leaves(id),x=60+(first+own/2)*col-cardW/2,y=32+depth*row;positions.set(id,{x,y});
+   let cursor=first;for(const item of childrenOf(id)){orgPlace(item.id,depth+1,cursor);cursor+=leaves(item.id)}
+  }orgPlace(root.id,0,0);height=Math.max(410,Math.max(...[...positions.values()].map(p=>p.y+cardH))+70)
+ }
+ surface.style.width=width+'px';surface.style.height=height+'px';
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('width',width);svg.setAttribute('height',height);
+ for(const item of n.tree){const p=positions.get(item.id),q=positions.get(item.parentId);if(!p||!q)continue;
+  let d;if(n.kind==='mindmap'){const goingRight=p.x>q.x;const sx=q.x+(goingRight?(item.parentId===root.id?185:cardW):0),ex=p.x+(goingRight?0:cardW),sy=q.y+cardH/2,ey=p.y+cardH/2;
+   d=`M${sx} ${sy} C${sx+(ex-sx)*.5} ${sy},${sx+(ex-sx)*.5} ${ey},${ex} ${ey}`;
+  }else{const sx=q.x+cardW/2,sy=q.y+cardH,ex=p.x+cardW/2,ey=p.y;d=`M${sx} ${sy} V${sy+18} H${ex} V${ey}`}
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',d);path.setAttribute('stroke',n.kind==='mindmap'?'#8b78cf':'#6485c2');path.setAttribute('stroke-width','2.5');path.setAttribute('fill','none');svg.append(path)
+ }
+ surface.append(svg);
+ for(const item of n.tree){
+  const p=positions.get(item.id);if(!p)continue;
+  const card=document.createElement('div');card.className='tree-card'+(item.id===root.id?' root':'');
+  card.style.left=p.x+'px';card.style.top=p.y+'px';
+  const name=document.createElement('div');name.className='branch-label';name.textContent=item.label||'Sem título';makeEditableField(name,item,'label',n.id);
+  const note=document.createElement('div');note.className='branch-detail';note.textContent=item.detail||' ';makeEditableField(note,item,'detail',n.id);
+  card.append(name,note);
+  if(!locked){const actions=document.createElement('div');actions.className='tree-actions';const add=document.createElement('button');add.type='button';add.textContent='+';add.title='Adicionar sub-ramo';add.onclick=()=>addBranch(item.id);add.addEventListener('pointerdown',e=>e.stopPropagation());actions.append(add);
+   if(item.id!==root.id){const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Excluir ramo e descendentes';remove.onclick=()=>removeBranch(item.id);remove.addEventListener('pointerdown',e=>e.stopPropagation());actions.append(remove)}
+   card.append(actions)}
+  surface.append(card)
+ }
+ body.append(surface);const cap=document.createElement('p');cap.className='tree-caption';cap.textContent=n.kind==='mindmap'?'Adicione ramificações e edite os textos diretamente.':'Adicione cargos e subordinados; as linhas se reorganizam automaticamente.';body.append(cap);el.append(body)
+}
+
 function renderTemplate(el,n){
+ if(n.kind==='mindmap'||n.kind==='orgchart'){renderTreeTemplate(el,n);return}
+ if(n.kind==='agenda'){renderAgendaTemplate(el,n);return}
+ if(n.kind==='timeline'){renderTimelineTemplate(el,n);return}
+ if(n.kind==='slides'){renderSlideTemplate(el,n);return}
  const body=document.createElement('div');body.className='template-body';body.setAttribute('aria-readonly',String(locked));
  const heading=document.createElement('div');heading.className='template-title';heading.contentEditable=String(!locked);heading.textContent=n.titleText||'Bloco editável';body.append(heading);
  const setValue=(target,key,owner)=>{let before='';target.addEventListener('focus',()=>{before=snapshot();selectNode(n.id)});
