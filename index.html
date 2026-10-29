@@ -275,9 +275,15 @@ function cancelInteractionForPinch(){
  const d=interaction;interaction=null;viewport.classList.remove('panning');
  if(!d)return;
  if((d.kind==='move'||d.kind==='resize')&&d.isTouch){
-  const n=nodes.find(n=>n.id===d.id);if(n){n.x=d.x;n.y=d.y;n.w=d.w;n.h=d.h}
+  const n=nodes.find(n=>n.id===d.id);
+  if(n){
+   n.x=d.x;n.y=d.y;n.w=d.w;n.h=d.h;
+   // Preserva o elemento DOM sob os dedos para o navegador não cancelar o toque.
+   const el=$(`.node[data-id="${n.id}"]`);
+   if(el){el.style.left=n.x+'px';el.style.top=n.y+'px';el.style.width=n.w+'px';el.style.height=n.h+'px'}
+  }
   if(d.checkpointed){history.pop();future=d.previousFuture||[];updateUndoButtons()}
-  render();
+  drawLines();
  }else if(d.kind==='draw'&&d.path){
   paths=paths.filter(p=>p.id!==d.path.id);
   if(d.checkpointed){history.pop();updateUndoButtons()}
