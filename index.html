@@ -793,7 +793,14 @@ function placeContextToolbar(){
  const below=r.bottom+9;
  const preferred=top>=74?top:(below+toolbar.offsetHeight<window.innerHeight-8?below:74);
  toolbar.style.left=Math.round(x)+'px';
- toolbar.style.top=Math.max(74,Math.min(window.innerHeight-toolbar.offsetHeight-8,preferred))+'px';
+ const t=Math.max(74,Math.min(window.innerHeight-toolbar.offsetHeight-8,preferred));
+ toolbar.style.top=Math.round(t)+'px';
+ if(!ctxPopover.hidden){
+  const above=t-ctxPopover.offsetHeight-10;
+  ctxPopover.classList.toggle('ctx-below',above<8);
+  const maxLeft=Math.max(0,toolbar.offsetWidth-ctxPopover.offsetWidth);
+  ctxPopover.style.left=Math.max(0,Math.min(maxLeft,0))+'px';
+ }
 }
 function contextValue(obj,key){
  if(obj.kind==='arrow')return {bg:obj.arrow.color||'#394c78',fg:'#243047',font:16,width:obj.arrow.width||3,height:0}[key];
@@ -811,6 +818,10 @@ function updateContextToolbar(){
   if(document.activeElement!==ctxInput[key])ctxInput[key].value=contextValue(obj,key);
  }
  const isArrow=obj.kind==='arrow';
+ const currentFill=contextValue(obj,'bg');
+ $('.ctx-fill-icon',toolbar).style.backgroundColor=/^#[0-9a-f]{6}$/i.test(currentFill)?currentFill:'#ffffff';
+ const currentLetter=contextValue(obj,'fg');
+ $('.ctx-a-icon',toolbar).style.color=/^#[0-9a-f]{6}$/i.test(currentLetter)?currentLetter:'#243047';
  const canFont=obj.kind==='branch'||(obj.kind==='node'&&['note','text','template'].includes(obj.node.type));
  $('#context-show-fg').disabled=!canFont;
  $('#context-show-font').disabled=!canFont;
@@ -919,7 +930,42 @@ document.addEventListener('pointerdown',e=>{
  if(e.target.closest('.node,.arrow-hit,.arrow-control,.arrow-bend-handle')){closeContextPopover();return}
  hideContextToolbar()
 },true);
-function setTool(next){if(locked&&next!=='hand')return;tool=next;$$('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===next));viewport.classList.toggle('hand',next==='hand');viewport.classList.toggle('pen',next==='pen');viewport.classList.toggle('arrow',next==='arrow'||next==='curved-arrow');setToolsOpen(false);$('#tool-label').textContent=({select:'Seleção',hand:'Movimento',note:'Nota',text:'Texto',rect:'Retângulo',ellipse:'Círculo',pen:'Caneta',arrow:'Seta','curved-arrow':'Seta curva',link:'Conexão'})[next]||next}
+const brushPanel=$('#brush-toolbar');
+function syncBrushToolbar(){
+ const active=!locked&&(tool==='pen'||tool==='eraser');
+ brushPanel.hidden=!active;
+ if(!active)return;
+ const erase=tool==='eraser';
+ $('#brush-tool-pen').classList.toggle('active',!erase);
+ $('#brush-tool-eraser').classList.toggle('active',erase);
+ $('#brush-tool-pen').setAttribute('aria-pressed',String(!erase));
+ $('#brush-tool-eraser').setAttribute('aria-pressed',String(erase));
+ $('#brush-bar-title').textContent=erase?'Borracha':'Caneta';
+ $('#brush-color-section').hidden=erase;
+ $('.brush-size-line',brushPanel).hidden=erase;
+ $('.eraser-size-line',brushPanel).hidden=!erase;
+ $('.brush-preview',brushPanel).hidden=erase;
+ $('#brush-color').value=brush.color;
+ $('#brush-width').value=brush.width;
+ $('#brush-width-label').textContent=brush.width+' px';
+ $('#eraser-width').value=brush.eraserSize;
+ $('#eraser-width-label').textContent=brush.eraserSize+' px';
+ $('#brush-preview-line').style.backgroundColor=brush.color;
+ $('#brush-preview-line').style.height=brush.width+'px';
+ $$('#brush-swatches button').forEach(b=>b.classList.toggle('selected',b.dataset.color?.toLowerCase()===brush.color.toLowerCase()));
+}
+const brushColors=['#243047','#344f81','#ffffff','#e84d63','#ff9a3c','#ead044','#18a275','#0fa8c4','#8957e8'];
+for(const color of brushColors){
+ const btn=document.createElement('button');btn.type='button';btn.dataset.color=color;btn.style.backgroundColor=color;btn.setAttribute('aria-label','Cor da caneta '+color);
+ btn.title='Cor '+color;btn.onclick=()=>{brush.color=color;syncBrushToolbar();scheduleSave()};
+ $('#brush-swatches').append(btn)
+}
+$('#brush-tool-pen').onclick=()=>setTool('pen');
+$('#brush-tool-eraser').onclick=()=>setTool('eraser');
+$('#brush-color').addEventListener('input',e=>{brush.color=e.target.value;syncBrushToolbar();scheduleSave()});
+$('#brush-width').addEventListener('input',e=>{brush.width=Math.max(1,Math.min(24,Number(e.target.value)||3));syncBrushToolbar();scheduleSave()});
+$('#eraser-width').addEventListener('input',e=>{brush.eraserSize=Math.max(8,Math.min(90,Number(e.target.value)||24));syncBrushToolbar();scheduleSave()});
+function setTool(next){if(locked&&next!=='hand')return;tool=next;$$('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===next));viewport.classList.toggle('hand',next==='hand');viewport.classList.toggle('pen',next==='pen');viewport.classList.toggle('eraser',next==='eraser');viewport.classList.toggle('arrow',next==='arrow'||next==='curved-arrow');setToolsOpen(false);$('#tool-label').textContent=({select:'Seleção',hand:'Movimento',note:'Nota',text:'Texto',rect:'Retângulo',ellipse:'Círculo',pen:'Caneta',eraser:'Borracha',arrow:'Seta','curved-arrow':'Seta curva',link:'Conexão'})[next]||next;syncBrushToolbar()}
 function selectNode(id){
  if(locked&&id!==null)return;
  selected=id;$$('.node').forEach(el=>el.classList.toggle('selected',el.dataset.id===id));
@@ -1467,7 +1513,7 @@ function pointerDown(e){
  }
  if(tool==='pen'){
   if(isTouch){interaction={kind:'pending-draw',pointerId:e.pointerId,start:p,startX:e.clientX,startY:e.clientY};return}
-  checkpoint();const path={id:uid(),points:[p],color:'#344f81',width:3};paths.push(path);interaction={kind:'draw',path,pointerId:e.pointerId,checkpointed:true};return
+  checkpoint();const path={id:uid(),points:[p],color:brush.color,width:brush.width};paths.push(path);interaction={kind:'draw',path,pointerId:e.pointerId,checkpointed:true};return
  }
  if(['note','text','rect','ellipse'].includes(tool)){
   if(isTouch){interaction={kind:'pending-create',pointerId:e.pointerId,createTool:tool,point:p};return}
@@ -1510,7 +1556,7 @@ function pointerMove(e){
  }
  if(d.kind==='pending-draw'){
   if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<10)return;
-  checkpoint();const path={id:uid(),points:[d.start,toWorld(e.clientX,e.clientY)],color:'#344f81',width:3};
+  checkpoint();const path={id:uid(),points:[d.start,toWorld(e.clientX,e.clientY)],color:brush.color,width:brush.width};
   paths.push(path);interaction={kind:'draw',path,pointerId:e.pointerId,checkpointed:true};drawLines();return
  }
  if(d.kind==='draw'){d.path.points.push(toWorld(e.clientX,e.clientY));drawLines();return}
