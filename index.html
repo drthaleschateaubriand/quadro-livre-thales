@@ -1075,70 +1075,183 @@ $('#branch-file-picker').addEventListener('change',async e=>{
 
 function renderTreeTemplate(el,n){
  const body=document.createElement('div');body.className='template-body special-template';
- if(!Array.isArray(n.tree)||!n.tree.length){const id=uid();n.tree=[{id,parentId:null,label:n.kind==='orgchart'?'Direção':'Tema central',detail:'',side:'right'}]}
- specialHeader(n,body,[{label:'＋ Novo ramo',edit:true,action:()=>{if(locked)return;const root=n.tree.find(t=>t.parentId===null);addBranch(root?.id)}}]);
- const root=n.tree.find(t=>t.parentId===null)||n.tree[0],childrenOf=id=>n.tree.filter(t=>t.parentId===id);
+ if(!Array.isArray(n.tree)||!n.tree.length){
+  const id=uid();n.tree=[{id,parentId:null,label:n.kind==='orgchart'?'Direção':'Tema central',detail:'',side:'right'}];
+ }
+ const root=n.tree.find(t=>t.parentId===null)||n.tree[0];
+ const childrenOf=id=>n.tree.filter(t=>t.parentId===id);
  function addBranch(parentId){
-  if(locked)return;const parent=n.tree.find(t=>t.id===parentId);if(!parent)return;
-  checkpoint();n.tree.push({id:uid(),parentId,label:n.kind==='mindmap'?'Novo ramo':'Novo cargo',detail:'Editar descrição',side:n.kind==='mindmap'?((childrenOf(root.id).length%2)?'left':'right'):'right'});
+  if(locked)return;
+  const parent=n.tree.find(t=>t.id===parentId);if(!parent)return;
+  if(n.tree.length>=160)return toast('Este mapa chegou ao limite de 160 subtópicos.');
+  checkpoint();
+  const rootChildren=childrenOf(root.id);
+  const side=n.kind==='mindmap'?(parent.id===root.id?(rootChildren.length%2?'left':'right'):(parent.side||'right')):'right';
+  n.tree.push({id:uid(),parentId,label:n.kind==='mindmap'?'Nova ideia':'Novo cargo',detail:'Escreva mais informações aqui',side,blocks:[]});
   render();selectNode(n.id);scheduleSave();
  }
  function removeBranch(id){
-  if(locked||id===root.id)return;checkpoint();
-  const removes=new Set([id]);let changed=true;while(changed){changed=false;for(const item of n.tree)if(removes.has(item.parentId)&&!removes.has(item.id)){removes.add(item.id);changed=true}}
-  n.tree=n.tree.filter(x=>!removes.has(x.id));render();selectNode(n.id);scheduleSave()
+  if(locked||id===root.id)return;
+  if(!confirm('Excluir este subtópico e todos os seus sub-ramos?'))return;
+  checkpoint();const removed=new Set([id]);let repeat=true;
+  while(repeat){repeat=false;for(const t of n.tree)if(removed.has(t.parentId)&&!removed.has(t.id)){removed.add(t.id);repeat=true}}
+  n.tree=n.tree.filter(t=>!removed.has(t.id));
+  if(branchEditorTarget?.nodeId===n.id&&removed.has(branchEditorTarget.itemId))closeBranchEditor();
+  render();selectNode(n.id);scheduleSave();
+ }
+ specialHeader(n,body,[{label:'＋ Novo ramo',edit:true,action:()=>addBranch(root.id)},{label:'Editar tema',edit:true,action:()=>openBranchEditor(n.id,root.id)}]);
+ const cardW=item=>branchWidth(item);
+ function estimatedHeight(item){
+  const font=branchFontSize(item),w=cardW(item),approx=Math.max(10,(w-35)/(font*.59));
+  const lines=value=>String(value||'').split('\n').reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.length/approx)),0);
+  let height=34+lines(item.label)*(font*1.37)+lines(item.detail)*(font*.88*1.42)+16;
+  for(const b of item.blocks||[]){
+   if(b.type==='text')height+=Math.min(145,15+lines(b.text)*(font*.82*1.45));
+   if(b.type==='link')height+=37;
+   if(b.type==='file')height+=b.mime?.startsWith('image/')?150:39;
+  }
+  return Math.ceil(Math.max(103,Math.min(380,height)));
+ }
+ const cardHeights=new Map(n.tree.map(item=>[item.id,estimatedHeight(item)]));
+ const positions=new Map(),sizeX=398,gapY=30;
+ let width=1050,height=580;
+ if(n.kind==='mindmap'){
+  const branches=childrenOf(root.id),left=branches.filter(t=>t.side==='left'),right=branches.filter(t=>t.side!=='left');
+  const treeSpan=(t,level=0)=>{
+   if(level>12)return cardHeights.get(t.id)+gapY;
+   const children=childrenOf(t.id);
+   const sub=children.reduce((sum,c)=>sum+treeSpan(c,level+1),0);
+   return Math.max(cardHeights.get(t.id)+gapY,sub);
+  };
+  const total=arr=>arr.reduce((sum,item)=>sum+treeSpan(item),0);
+  const leftSpan=total(left),rightSpan=total(right);
+  const maxSpan=Math.max(leftSpan,rightSpan,cardHeights.get(root.id)+110,450);
+  height=maxSpan+100;
+  const maxDepth=(t,level=1)=>Math.max(level,...childrenOf(t.id).map(c=>maxDepth(c,level+1)));
+  const leftDepth=Math.max(0,...left.map(t=>maxDepth(t))),rightDepth=Math.max(0,...right.map(t=>maxDepth(t)));
+  const rootX=leftDepth*sizeX+45,rootH=cardHeights.get(root.id);
+  positions.set(root.id,{x:rootX,y:height/2-rootH/2});
+  function placeBranch(item,side,depth,top){
+   const span=treeSpan(item),h=cardHeights.get(item.id);
+   const pos={x:rootX+(side==='left'?-1:1)*sizeX*depth,y:top+(span-h)/2};
+   positions.set(item.id,pos);
+   const children=childrenOf(item.id),subTotal=total(children);
+   let cursor=top+(span-subTotal)/2;
+   for(const child of children){placeBranch(child,side,depth+1,cursor);cursor+=treeSpan(child)}
+  }
+  for(const [side,list] of [['left',left],['right',right]]){
+   let cursor=(height-total(list))/2;
+   for(const t of list){placeBranch(t,side,1,cursor);cursor+=treeSpan(t)}
+  }
+  width=Math.max(1150,rootX+rightDepth*sizeX+420);
+ }else{
+  const leaves=(id,level=0)=>{
+   if(level>12)return 1;
+   const children=childrenOf(id);
+   return Math.max(1,children.reduce((sum,t)=>sum+leaves(t.id,level+1),0))
+  };
+  const rowHeights=new Map();
+  function collect(item,depth){
+   rowHeights.set(depth,Math.max(rowHeights.get(depth)||0,cardHeights.get(item.id)));
+   if(depth<12)for(const c of childrenOf(item.id))collect(c,depth+1)
+  }
+  collect(root,0);
+  const depths=[...rowHeights.keys()].sort((a,b)=>a-b),rowTops=new Map();
+  let y=24;for(const depth of depths){rowTops.set(depth,y);y+=rowHeights.get(depth)+68}
+  height=Math.max(540,y+30);
+  const totalLeaves=leaves(root.id),colW=415;
+  width=Math.max(1100,totalLeaves*colW+95);
+  function placeOrg(item,depth,first){
+   const own=leaves(item.id);
+   positions.set(item.id,{x:55+(first+own/2)*colW-cardW(item)/2,y:rowTops.get(depth)||24});
+   let cursor=first;
+   for(const child of childrenOf(item.id)){placeOrg(child,depth+1,cursor);cursor+=leaves(child.id)}
+  }
+  placeOrg(root,0,0);
  }
  const surface=document.createElement('div');surface.className='tree-surface';
- const positions=new Map(),cardW=162,cardH=67;
- let width=960,height=480;
- if(n.kind==='mindmap'){
-  const xroot=485,spacingX=202,spacingY=92;
-  const branches=childrenOf(root.id);
-  const groups={left:branches.filter(x=>x.side==='left'),right:branches.filter(x=>x.side!=='left')};
-  function leaves(id){const c=childrenOf(id);return c.length?c.reduce((sum,b)=>sum+leaves(b.id),0):1}
-  const total=Math.max(4,...Object.values(groups).map(a=>a.reduce((sum,b)=>sum+leaves(b.id),0)));
-  height=Math.max(460,total*spacingY+120);
-  positions.set(root.id,{x:xroot,y:height/2-cardH/2});
-  function branchPlace(id,depth,side,min,max){
-   const y=(min+max)/2*spacingY+60;const x=xroot+(side==='left'?-1:1)*spacingX*depth-(side==='left'?0:0);
-   positions.set(id,{x,y});const childs=childrenOf(id);let index=min;
-   for(const item of childs){const length=leaves(item.id);branchPlace(item.id,depth+1,side,index,index+length);index+=length}
-  }
-  for(const side of ['left','right']){const group=groups[side];let cursor=(total-group.reduce((sum,b)=>sum+leaves(b.id),0))/2;for(const item of group){const length=leaves(item.id);branchPlace(item.id,1,side,cursor,cursor+length);cursor+=length}}
-  const leftMost=Math.min(...[...positions.values()].map(p=>p.x)),rightMost=Math.max(...[...positions.values()].map(p=>p.x+cardW));
-  const offset=leftMost<30?35-leftMost:0;for(const p of positions.values())p.x+=offset;
-  width=Math.max(980,rightMost+offset+45)
- }else{
-  const col=204,row=112;const leaves=id=>{const c=childrenOf(id);return c.length?c.reduce((sum,b)=>sum+leaves(b.id),0):1};
-  const total=leaves(root.id);width=Math.max(900,total*col+120);
-  function orgPlace(id,depth,first){const own=leaves(id),x=60+(first+own/2)*col-cardW/2,y=32+depth*row;positions.set(id,{x,y});
-   let cursor=first;for(const item of childrenOf(id)){orgPlace(item.id,depth+1,cursor);cursor+=leaves(item.id)}
-  }orgPlace(root.id,0,0);height=Math.max(410,Math.max(...[...positions.values()].map(p=>p.y+cardH))+70)
- }
  surface.style.width=width+'px';surface.style.height=height+'px';
- const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',`0 0 ${width} ${height}`);svg.setAttribute('width',width);svg.setAttribute('height',height);
- for(const item of n.tree){const p=positions.get(item.id),q=positions.get(item.parentId);if(!p||!q)continue;
-  let d;if(n.kind==='mindmap'){const goingRight=p.x>q.x;const sx=q.x+(goingRight?(item.parentId===root.id?185:cardW):0),ex=p.x+(goingRight?0:cardW),sy=q.y+cardH/2,ey=p.y+cardH/2;
-   d=`M${sx} ${sy} C${sx+(ex-sx)*.5} ${sy},${sx+(ex-sx)*.5} ${ey},${ex} ${ey}`;
-  }else{const sx=q.x+cardW/2,sy=q.y+cardH,ex=p.x+cardW/2,ey=p.y;d=`M${sx} ${sy} V${sy+18} H${ex} V${ey}`}
-  const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',d);path.setAttribute('stroke',n.kind==='mindmap'?'#8b78cf':'#6485c2');path.setAttribute('stroke-width','2.5');path.setAttribute('fill','none');svg.append(path)
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+ svg.setAttribute('width',width);svg.setAttribute('height',height);
+ const ns='http://www.w3.org/2000/svg';
+ for(const item of n.tree){
+  const p=positions.get(item.id),parent=n.tree.find(t=>t.id===item.parentId),q=positions.get(item.parentId);
+  if(!p||!q||!parent)continue;
+  const parentW=cardW(parent),parentH=cardHeights.get(parent.id),h=cardHeights.get(item.id);
+  let d;
+  if(n.kind==='mindmap'){
+   const right=p.x>=q.x,sx=q.x+(right?parentW:0),ex=p.x+(right?0:cardW(item));
+   const sy=q.y+parentH/2,ey=p.y+h/2,mid=(sx+ex)/2;
+   d=`M ${sx} ${sy} C ${mid} ${sy},${mid} ${ey},${ex} ${ey}`;
+  }else{
+   const sx=q.x+parentW/2,sy=q.y+parentH,ex=p.x+cardW(item)/2,ey=p.y,mid=(sy+ey)/2;
+   d=`M ${sx} ${sy} V ${mid} H ${ex} V ${ey}`;
+  }
+  const path=document.createElementNS(ns,'path');path.setAttribute('d',d);
+  path.setAttribute('stroke',n.kind==='mindmap'?'#8b78cf':'#6485c2');path.setAttribute('stroke-width','2.5');path.setAttribute('fill','none');svg.append(path);
  }
  surface.append(svg);
  for(const item of n.tree){
   const p=positions.get(item.id);if(!p)continue;
-  const card=document.createElement('div');card.className='tree-card'+(item.id===root.id?' root':'');
+  const isRoot=item.id===root.id;
+  const card=document.createElement('div');card.className='tree-card'+(isRoot?' root':'');
+  if(branchEditorTarget?.nodeId===n.id&&branchEditorTarget.itemId===item.id)card.classList.add('active-branch');
+  card.dataset.branchId=item.id;
   card.style.left=p.x+'px';card.style.top=p.y+'px';
-  const name=document.createElement('div');name.className='branch-label';name.textContent=item.label||'Sem título';makeEditableField(name,item,'label',n.id);
-  const note=document.createElement('div');note.className='branch-detail';note.textContent=item.detail||' ';makeEditableField(note,item,'detail',n.id);
-  card.append(name,note);
-  if(!locked){const actions=document.createElement('div');actions.className='tree-actions';const add=document.createElement('button');add.type='button';add.textContent='+';add.title='Adicionar sub-ramo';add.onclick=()=>addBranch(item.id);add.addEventListener('pointerdown',e=>e.stopPropagation());actions.append(add);
-   if(item.id!==root.id){const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Excluir ramo e descendentes';remove.onclick=()=>removeBranch(item.id);remove.addEventListener('pointerdown',e=>e.stopPropagation());actions.append(remove)}
-   card.append(actions)}
+  card.style.width=cardW(item)+'px';card.style.height=cardHeights.get(item.id)+'px';
+  card.style.background=branchColor(item,'bgColor',isRoot?'#3659ad':'#ffffff');
+  card.style.color=branchColor(item,'textColor',isRoot?'#ffffff':'#253650');
+  card.style.setProperty('--branch-size',branchFontSize(item)+'px');
+  const name=document.createElement('div');name.className='branch-label';
+  name.textContent=item.label||'';makeEditableField(name,item,'label',n.id);
+  const description=document.createElement('div');description.className='branch-detail';
+  description.textContent=item.detail||'';makeEditableField(description,item,'detail',n.id);
+  card.append(name,description);
+  const blocks=document.createElement('div');blocks.className='branch-body';
+  for(const block of item.blocks||[]){
+   if(block.type==='text'){
+    const note=document.createElement('div');note.className='branch-note';note.textContent=block.text||'';
+    makeEditableField(note,block,'text',n.id);blocks.append(note)
+   }else if(block.type==='link'){
+    const button=document.createElement('button');button.type='button';button.className='branch-hyperlink';
+    button.textContent='↗ '+(block.label||block.url||'Editar link');button.title=block.url||'Edite o hyperlink';
+    button.onclick=e=>{e.stopPropagation();if(safeWebUrl(block.url))openSafeLink(block.url);else if(!locked)openBranchEditor(n.id,item.id)};
+    blocks.append(button)
+   }else if(block.type==='file'){
+    if(block.mime?.startsWith('image/')){
+     const img=document.createElement('img');img.className='branch-image';img.alt=block.name||'Imagem anexada';
+     img.loading='lazy';displayAttachedImage({id:block.id,attachmentId:block.attachmentId},img);blocks.append(img)
+    }
+    const button=document.createElement('button');button.type='button';button.className='branch-attachment';
+    button.textContent='▣ '+(block.name||'Arquivo');button.title='Baixar o anexo';button.onclick=e=>{e.stopPropagation();downloadAttachment(block)};
+    blocks.append(button)
+   }
+  }
+  if(blocks.childNodes.length)card.append(blocks);
+  if(!locked){
+   const actions=document.createElement('div');actions.className='tree-actions';
+   const edit=document.createElement('button');edit.type='button';edit.className='tree-edit';edit.textContent='✎';edit.title='Editar texto, cores, links e arquivos deste subtópico';
+   edit.addEventListener('pointerdown',e=>e.stopPropagation());edit.onclick=e=>{e.stopPropagation();openBranchEditor(n.id,item.id)};actions.append(edit);
+   const add=document.createElement('button');add.type='button';add.textContent='+';add.title='Adicionar sub-ramo';
+   add.addEventListener('pointerdown',e=>e.stopPropagation());add.onclick=e=>{e.stopPropagation();addBranch(item.id)};actions.append(add);
+   if(!isRoot){
+    const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Excluir subtópico e seus ramos';
+    remove.addEventListener('pointerdown',e=>e.stopPropagation());remove.onclick=e=>{e.stopPropagation();removeBranch(item.id)};actions.append(remove)
+   }
+   card.prepend(actions);
+  }
+  card.addEventListener('dblclick',e=>{
+   if(e.target.closest('button,[contenteditable]'))return;
+   if(!locked)openBranchEditor(n.id,item.id)
+  });
   surface.append(card)
  }
- body.append(surface);const cap=document.createElement('p');cap.className='tree-caption';cap.textContent=n.kind==='mindmap'?'Adicione ramificações e edite os textos diretamente.':'Adicione cargos e subordinados; as linhas se reorganizam automaticamente.';body.append(cap);el.append(body)
+ body.append(surface);
+ const cap=document.createElement('p');cap.className='tree-caption';
+ cap.textContent=n.kind==='mindmap'?'Edite diretamente cada ramificação. Toque em ✎ para mudar cor, tamanho da fonte, adicionar texto, links e arquivos.':'Cada cargo tem seu próprio editor: use ✎ para textos adicionais, cores, imagens, arquivos e links.';
+ body.append(cap);el.append(body);
 }
-
 
 function localDateString(date){return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-')}
 function localMonthString(date){return localDateString(date).slice(0,7)}
