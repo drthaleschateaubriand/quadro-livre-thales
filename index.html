@@ -258,6 +258,17 @@ body.styles-open #inspector{display:none}
 .node.template .template-item .item-detail{color:var(--ql-font-color,#243047);font-size:var(--ql-font-size,14px)}
 .node.template .template-title{font-size:calc(var(--ql-font-size,18px)*1.2)}
 @media(max-width:760px){.styles-panel{top:70px;right:7px;bottom:8px;width:min(310px,calc(100vw - 14px))}.styles-toggle{height:35px;min-width:35px;padding:0 7px}.styles-toggle span{display:none}}
+
+/* Fontes nos mapas, apresentações, agendas e cronogramas */
+.node.template .slide-edit-title{font-size:calc(var(--ql-font-size,16px)*2);color:var(--ql-font-color,#243047)}
+.node.template .slide-edit-detail{font-size:var(--ql-font-size,16px);color:var(--ql-font-color,#243047)}
+.node.template .slide-canvas.section .slide-edit-title,.node.template .slide-canvas.section .slide-edit-detail{color:#fff}
+.node.template .tree-card:not(.root) .branch-label{font-size:calc(var(--ql-font-size,16px)*.82);color:var(--ql-font-color,#243047)}
+.node.template .tree-card:not(.root) .branch-detail{font-size:calc(var(--ql-font-size,16px)*.68);color:var(--ql-font-color,#243047)}
+.node.template .tree-card.root .branch-label{font-size:calc(var(--ql-font-size,16px)*.82)}
+.node.template .tree-card.root .branch-detail{font-size:calc(var(--ql-font-size,16px)*.68)}
+.node.template .timeline-label input[type=text]{font-size:calc(var(--ql-font-size,16px)*.82);color:var(--ql-font-color,#243047)}
+.node.template .agenda-event{font-size:calc(var(--ql-font-size,16px)*.70)}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -540,7 +551,7 @@ function setLocked(value,quiet=false){
  if(!quiet){scheduleSave();toast(locked?'Quadro travado. Zoom e movimentação liberados.':'Quadro destravado. Edição liberada.');}
 }
 $('#board-lock').addEventListener('click',()=>setLocked(!locked));
-function makeNode(type,x,y,extra={}){let defaults={note:[300,195],text:[370,150],rect:[250,150],ellipse:[210,160],file:[360,280]};let [w,h]=defaults[type]||[270,200];return {id:uid(),type,x:Math.round(x),y:Math.round(y),w,h,color:type==='note'?boardStyle.note:(type==='rect'||type==='ellipse'?boardStyle.shape:(cssColors[type]||'#ffffff')),fontColor:boardStyle.font,fontSize:type==='text'?Math.max(21,boardStyle.fontSize):boardStyle.fontSize,text:type==='note'?'Escreva sua ideia aqui...':type==='text'?'Título ou anotação':'',...extra}}
+function makeNode(type,x,y,extra={}){let defaults={note:[300,195],text:[370,150],rect:[250,150],ellipse:[210,160],file:[360,280]};let [w,h]=defaults[type]||[270,200];return {id:uid(),type,x:Math.round(x),y:Math.round(y),w,h,color:type==='note'?boardStyle.note:(type==='rect'||type==='ellipse'?boardStyle.shape:(cssColors[type]||'#ffffff')),fontColor:boardStyle.font,fontSize:boardStyle.fontSize,text:type==='note'?'Escreva sua ideia aqui...':type==='text'?'Título ou anotação':'',...extra}}
 const snapshot=()=>JSON.stringify({nodes,connectors,paths,arrows,style:boardStyle});
 function checkpoint(){history.push(snapshot());if(history.length>45)history.shift();future=[];updateUndoButtons()}
 function undo(){if(locked||!history.length)return;future.push(snapshot());restoreSnapshot(history.pop());updateUndoButtons()}
@@ -1425,14 +1436,16 @@ async function importProject(file,skipConfirmation=false){
   workspace=o;activeFolderId='root';workspace.activeFolderId='root';
   const root=workspace.canvases.root||emptyBoard('Meu quadro principal');
   nodes=root.nodes||[];connectors=root.connectors||[];paths=root.paths||[];arrows=root.arrows||[];
+  boardStyle=normalizedBoardStyle(root.style);applyBoardBackground();
   title.value=root.title||'Meu quadro principal';locked=!!root.locked;
-  history=[];future=[];selected=null;render();setLocked(locked,true);fitView();renderFolders();scheduleSave();
+  history=[];future=[];selected=null;render();setLocked(locked,true);fitView();renderFolders();updateStylePanel();scheduleSave();
   toast('Pastas e quadros restaurados do backup.');return;
  }
  if(!Array.isArray(o.nodes)||o.nodes.length>2000)throw Error('Arquivo de projeto incompatível');
  checkpoint();nodes=o.nodes;connectors=Array.isArray(o.connectors)?o.connectors:[];
  paths=Array.isArray(o.paths)?o.paths:[];arrows=Array.isArray(o.arrows)?o.arrows:[];
- title.value=String(o.title||'Quadro importado');selected=null;render();fitView();scheduleSave();toast('Quadro importado nesta pasta.');
+ if(o.style){boardStyle=normalizedBoardStyle(o.style);applyBoardBackground()}
+ title.value=String(o.title||'Quadro importado');selected=null;render();fitView();updateStylePanel();scheduleSave();toast('Quadro importado nesta pasta.');
 }
 function placeForFile(i,loc){const p=loc||centerWorld();return{x:p.x+(i%3)*370-140,y:p.y+Math.floor(i/3)*330-100}}
 async function importFiles(fileList,point){if(locked){toast('Destrave o quadro para importar arquivos.');return;}const files=[...fileList];if(!files.length)return;for(let i=0;i<files.length;i++){const f=files[i],p=placeForFile(i,point);try{if(/\.quadro\.zip$/i.test(f.name)){await importZipBackup(f);continue}if(/\.quadro\.json$/i.test(f.name)){await importProject(f);continue}
