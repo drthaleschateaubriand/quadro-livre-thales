@@ -63,6 +63,22 @@
 #lines .arrow-control{pointer-events:all;cursor:crosshair;stroke:#fff;stroke-width:3;fill:#5676ed}
 #viewport.is-locked #lines .arrow-hit,#viewport.is-locked #lines .arrow-control{pointer-events:none}
 #viewport.pen,#viewport.arrow{cursor:crosshair}
+
+.creation-menu{position:absolute;left:12px;top:78px;width:min(340px,calc(100vw - 24px));max-height:calc(100dvh - 94px);overflow:auto;z-index:20;background:white;border:1px solid #e3e8f0;border-radius:18px;padding:12px;box-shadow:0 18px 60px #26365035}
+.creation-menu[hidden],.bend-panel[hidden],.hyperlink-panel[hidden]{display:none}
+.creation-heading{display:flex;align-items:center;justify-content:space-between;font-weight:750;font-size:14px;margin:2px 8px 10px}
+.creation-options{display:flex;flex-direction:column;gap:2px}
+.creation-options button{border:0;background:white;border-radius:10px;text-align:left;display:flex;align-items:center;gap:17px;padding:11px 10px;font-size:15px;color:#27324a}
+.creation-options button:hover{background:#f1f4ff}
+.creation-options button span{font-size:23px;min-width:28px;text-align:center}
+.bend-panel,.hyperlink-panel{padding:0 0 13px;margin:0 0 13px;border-bottom:1px solid #e4eaf2;display:flex;flex-direction:column;gap:9px}
+.bend-panel label,.hyperlink-panel label{font-size:12px;color:#516078}
+.bend-actions{display:flex;gap:6px}.bend-actions button{min-width:0;flex:1;padding:0 5px}
+.hyperlink-panel input{border:1px solid #dbe3ee;border-radius:9px;padding:9px;font-size:12px;width:100%}
+.hyperlink-panel small{font-size:10px;color:#7b879d}
+.node .link-pill{position:absolute;right:8px;top:31px;z-index:3;font-size:12px;border:1px solid #c5d6fa;border-radius:8px;background:#eaf0ff;color:#3758a1;padding:4px 8px;cursor:pointer}
+#lines .arrow-bend-handle{fill:#805bea;stroke:white;stroke-width:3;cursor:crosshair;pointer-events:all}
+@media(max-width:760px){.creation-menu{top:68px;left:8px}.creation-trigger{min-width:35px;padding:0 7px}}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -71,6 +87,7 @@
   <header class="topbar">
     <button type="button" id="tool-menu" class="menu-toggle" aria-label="Abrir ferramentas" aria-controls="tools-panel" aria-expanded="false" title="Mostrar ou ocultar ferramentas"><span class="menu-lines" aria-hidden="true">☰</span><span class="menu-caption">Ferramentas</span></button>
     <button type="button" id="folders-toggle" class="menu-toggle folders-toggle" title="Minhas pastas" aria-controls="folders-panel" aria-expanded="false" aria-label="Abrir pastas"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3z"/></svg><span class="menu-caption">Pastas</span></button>
+    <button type="button" id="create-menu-toggle" class="menu-toggle creation-trigger" aria-controls="creation-menu" aria-expanded="false" title="Adicionar recursos"><span aria-hidden="true">＋</span><span class="menu-caption">Criar</span></button>
     <div class="brand"><div class="brand-icon">Q</div><div><strong>Quadro Livre</strong><small>Seu espaço de ideias</small></div></div>
     <div class="docinfo"><input aria-label="Nome do quadro" id="board-title" value="Meu primeiro quadro" maxlength="90"><span id="save-status">Pronto para editar</span></div>
     <div class="top-actions">
@@ -94,11 +111,27 @@
     <button class="tool" data-tool="ellipse" title="Círculo (O)"><span>◯</span><small>Círculo</small></button>
     <button class="tool" data-tool="pen" title="Desenhar (P)"><span>✎</span><small>Caneta</small></button>
     <button class="tool" data-tool="arrow" title="Desenhar seta livre (A)"><span>➝</span><small>Seta</small></button>
+    <button class="tool" data-tool="curved-arrow" title="Desenhar seta curva (C)"><span>⤳</span><small>Curva</small></button>
     <button class="tool" data-tool="link" title="Conectar dois cartões (L)"><span>↗</span><small>Ligar</small></button>
     <div class="rail-sep"></div>
     <button class="tool" id="insert-files" title="Importar arquivos"><span>▣</span><small>Arquivo</small></button>
     <button class="tool" id="insert-folder" title="Criar pasta"><span>▱</span><small>Pasta</small></button>
   </aside>
+  <aside id="creation-menu" class="creation-menu" hidden aria-label="Inserir modelos no quadro">
+  <div class="creation-heading">Adicionar ao quadro <button id="creation-close" class="icon-button" aria-label="Fechar">×</button></div>
+  <div class="creation-options">
+    <button data-template="prototype"><span style="color:#7965ff">▯</span>Protótipo</button>
+    <button data-template="diagram"><span style="color:#e68532">♧</span>Diagrama</button>
+    <button data-template="table"><span style="color:#02ab52">▦</span>Tabelas</button>
+    <button data-template="timeline"><span style="color:#02ab52">≡</span>Timeline</button>
+    <button data-template="kanban"><span style="color:#02ab52">▤</span>Kanban</button>
+    <button data-template="document"><span style="color:#08a7df">▤</span>Documento</button>
+    <button data-template="slides"><span style="color:#ff5264">▣</span>Slides</button>
+    <button data-template="engage"><span style="color:#ff5264">☷</span>Atividades do Engage</button>
+    <button data-template="talktrack"><span style="color:#0eaaa8">▣</span>Talktrack</button>
+    <button data-template="flows"><span style="color:#8662ff">⇄</span>Fluxos</button>
+    <button data-template="url"><span style="color:#266cdd">↗</span>Guardar hiperlink</button>
+  </div></aside>
   <aside id="folders-panel" class="folders-panel" hidden aria-label="Organizador de pastas">
     <div class="folder-head"><strong>Minhas pastas</strong><button id="folders-close" class="icon-button" type="button" aria-label="Fechar pastas">×</button></div>
     <div class="folder-actions"><button id="new-folder" class="primary" type="button">+ Nova pasta</button></div>
@@ -121,14 +154,16 @@
     <div class="inspector-head"><strong>Propriedades</strong><button id="close-inspector" class="icon-button" aria-label="Fechar">×</button></div>
     <label>Cor do elemento <input type="color" id="node-color" value="#fff1b8"></label>
     <label>Largura <input type="range" id="node-width" min="120" max="900" value="280"><output id="width-label">280 px</output></label>
+    <div id="arrow-bend-panel" class="bend-panel" hidden><label for="arrow-bend">Curvatura da seta</label><input type="range" id="arrow-bend" min="-420" max="420" step="5" value="0"><div class="bend-actions"><button class="secondary" type="button" id="arrow-straight">Reta</button><button class="secondary" type="button" id="arrow-curved">Curva</button></div></div>
+    <div id="hyperlink-panel" class="hyperlink-panel" hidden><label for="node-link">Hiperlink do elemento</label><input id="node-link" type="url" placeholder="https://exemplo.com" spellcheck="false"><div class="bend-actions"><button class="secondary" id="save-node-link" type="button">Guardar</button><button class="secondary" id="open-node-link" type="button">Abrir</button></div><small>Somente links http:// ou https://.</small></div>
     <div class="inspector-actions"><button class="secondary" id="duplicate-node">Duplicar</button><button class="danger" id="delete-node">Excluir</button></div>
     <div id="move-section" class="move-section"><label for="move-folder-target">Mover elemento para pasta</label><select id="move-folder-target"></select><button class="secondary" id="move-node" type="button">Mover para pasta</button></div>
   </aside>
   <div class="bottom-left"><span id="tool-label">Seleção</span><span class="separator">•</span><span id="count-label">0 elementos</span></div>
   <div id="toast" role="status" aria-live="polite"></div>
-  <input id="file-input" type="file" multiple accept=".pdf,.docx,.txt,.md,.json,.png,.jpg,.jpeg,.webp,.gif,.svg,.pptx,.xlsx,.csv,.html,*/*" hidden>
+  <input id="file-input" type="file" multiple hidden>
   <dialog id="welcome-dialog"><div class="dialog-body"><div class="dialog-mark">Q</div><h2>Seu quadro está pronto</h2><p>Crie notas, mova elementos, importe documentos e organize tudo em um espaço infinito.</p><p class="privacy-note"><strong>Privacidade:</strong> nesta versão, o salvamento é feito no navegador deste dispositivo. Para usar o mesmo quadro em outro aparelho, exporte e importe o arquivo do projeto. A sincronização em nuvem ainda não está ativada.</p><button class="primary" id="welcome-close">Começar a criar</button></div></dialog>
-<script>/* Quadro Livre v1.4.0 - editor de quadro infinito, sem servidor e sem rastreamento */
+<script>/* Quadro Livre v1.5.0 - editor de quadro infinito, sem servidor e sem rastreamento */
 (() => {
 'use strict';
 const $ = (q, el=document) => el.querySelector(q);
@@ -316,12 +351,14 @@ function centerWorld(){const r=viewport.getBoundingClientRect();return toWorld(r
 function zoomAt(factor,clientX,clientY){const r=viewport.getBoundingClientRect();const x=clientX-r.left,y=clientY-r.top;const previous=zoom;zoom=Math.max(.2,Math.min(4,zoom*factor));const k=zoom/previous;ox=x-(x-ox)*k;oy=y-(y-oy)*k;updateCamera();scheduleSave()}
 function zoomCenter(factor){const r=viewport.getBoundingClientRect();zoomAt(factor,r.left+r.width/2,r.top+r.height/2)}
 function fitView(){if(!nodes.length&&!arrows.length){zoom=1;ox=viewport.clientWidth/2;oy=viewport.clientHeight/2;updateCamera();return}const xs=[...nodes.flatMap(n=>[n.x,n.x+n.w]),...arrows.flatMap(a=>[a.x1,a.x2])],ys=[...nodes.flatMap(n=>[n.y,n.y+n.h]),...arrows.flatMap(a=>[a.y1,a.y2])];let minX=Math.min(...xs)-100,minY=Math.min(...ys)-100,maxX=Math.max(...xs)+100,maxY=Math.max(...ys)+100;zoom=Math.max(.2,Math.min(1.5,Math.min(viewport.clientWidth/(maxX-minX),viewport.clientHeight/(maxY-minY))));ox=(viewport.clientWidth-(maxX+minX)*zoom)/2;oy=(viewport.clientHeight-(maxY+minY)*zoom)/2;updateCamera();scheduleSave()}
-function setTool(next){if(locked&&next!=='hand')return;tool=next;$$('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===next));viewport.classList.toggle('hand',next==='hand');viewport.classList.toggle('pen',next==='pen');viewport.classList.toggle('arrow',next==='arrow');setToolsOpen(false);$('#tool-label').textContent=({select:'Seleção',hand:'Movimento',note:'Nota',text:'Texto',rect:'Retângulo',ellipse:'Círculo',pen:'Caneta',arrow:'Seta',link:'Conexão'})[next]||next}
+function setTool(next){if(locked&&next!=='hand')return;tool=next;$$('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===next));viewport.classList.toggle('hand',next==='hand');viewport.classList.toggle('pen',next==='pen');viewport.classList.toggle('arrow',next==='arrow'||next==='curved-arrow');setToolsOpen(false);$('#tool-label').textContent=({select:'Seleção',hand:'Movimento',note:'Nota',text:'Texto',rect:'Retângulo',ellipse:'Círculo',pen:'Caneta',arrow:'Seta','curved-arrow':'Seta curva',link:'Conexão'})[next]||next}
 function selectNode(id){
  if(locked&&id!==null)return;
  selected=id;$$('.node').forEach(el=>el.classList.toggle('selected',el.dataset.id===id));
  const n=nodes.find(n=>n.id===id),arrow=arrows.find(a=>a.id===id);
- inspector.hidden=!(n||arrow);$('#move-section').hidden=!n;
+ inspector.hidden=!(n||arrow);$('#move-section').hidden=!n;$('#arrow-bend-panel').hidden=!arrow;$('#hyperlink-panel').hidden=!n;
+ if(arrow)$('#arrow-bend').value=arrow.curve||0;
+ if(n)$('#node-link').value=n.href||'';
  const slider=$('#node-width'),widthLabel=$('#width-label');
  slider.min=arrow?1:120;slider.max=arrow?16:900;slider.step=1;
  if(n||arrow){
@@ -331,7 +368,7 @@ function selectNode(id){
  }
  // O destaque é atualizado sem reconstruir os controles em andamento.
  $$('.arrow-line').forEach(el=>el.setAttribute('stroke-width',String(arrows.find(a=>a.id===el.dataset.id)?.width||3)));
- $$('.arrow-control').forEach(el=>el.setAttribute('visibility',el.dataset.id===selected?'visible':'hidden'));
+ $$('.arrow-control,.arrow-bend-handle').forEach(el=>el.setAttribute('visibility',el.dataset.id===selected?'visible':'hidden'));
 }
 
 function addNode(type,x,y,more={}){if(locked)return null;checkpoint();let n=makeNode(type,x,y,more);nodes.push(n);render();selectNode(n.id);scheduleSave();return n}
@@ -357,8 +394,11 @@ function svgElement(tag,props={}){
  for(const [name,value] of Object.entries(props))el.setAttribute(name,String(value));
  return el;
 }
+function arrowControl(a){const dx=a.x2-a.x1,dy=a.y2-a.y1,d=Math.max(1,Math.hypot(dx,dy));return{x:(a.x1+a.x2)/2-dy/d*(a.curve||0),y:(a.y1+a.y2)/2+dx/d*(a.curve||0)}}
+function arrowPath(a){const c=arrowControl(a);return `M ${a.x1} ${a.y1} Q ${c.x} ${c.y} ${a.x2} ${a.y2}`}
+function arrowMid(a){const c=arrowControl(a);return{x:(a.x1+2*c.x+a.x2)/4,y:(a.y1+2*c.y+a.y2)/4}}
 function arrowDetails(a){
- const angle=Math.atan2(a.y2-a.y1,a.x2-a.x1),cos=Math.cos(angle),sin=Math.sin(angle);
+ const c=arrowControl(a),angle=Math.atan2(a.y2-c.y,a.x2-c.x),cos=Math.cos(angle),sin=Math.sin(angle);
  const len=Math.max(7,Math.min(19,(a.width||3)*4+4));
  const baseX=a.x2-len*cos,baseY=a.y2-len*sin;
  const half=Math.max(5,Math.min(11,(a.width||3)*2+2));
@@ -375,7 +415,7 @@ function startArrowInteraction(e,a,kind){
  if(!isTouch)checkpoint();
  interaction={kind,id:a.id,pointerId:e.pointerId,isTouch,checkpointed:!isTouch,
  start:toWorld(e.clientX,e.clientY),startClientX:e.clientX,startClientY:e.clientY,
- startedAt:performance.now(),x1:a.x1,y1:a.y1,x2:a.x2,y2:a.y2,
+ startedAt:performance.now(),x1:a.x1,y1:a.y1,x2:a.x2,y2:a.y2,curve:a.curve||0,
  previousFuture:isTouch?future.slice():null};
 }
 function drawLines(){
@@ -392,17 +432,20 @@ function drawLines(){
    stroke:p.color||'#394c78','stroke-width':p.width||3,'stroke-linecap':'round','stroke-linejoin':'round',fill:'none'});
   lines.append(el);
  }
- for(const a of arrows){
-  const line=svgElement('line',{x1:a.x1,y1:a.y1,x2:a.x2,y2:a.y2,stroke:a.color||'#394c78','stroke-width':a.width||3,'stroke-linecap':'round',class:'arrow-line'});
-  line.dataset.id=a.id;lines.append(line);
-  lines.append(svgElement('path',{d:arrowDetails(a),fill:a.color||'#394c78','pointer-events':'none'}));
+ for(const ar of arrows){
+  const d=arrowPath(ar),color=ar.color||'#394c78';
+  const line=svgElement('path',{d,stroke:color,'stroke-width':ar.width||3,'stroke-linecap':'round',fill:'none',class:'arrow-line'});
+  line.dataset.id=ar.id;lines.append(line);
+  lines.append(svgElement('path',{d:arrowDetails(ar),fill:color,'pointer-events':'none'}));
   if(!locked){
-   const hit=svgElement('line',{x1:a.x1,y1:a.y1,x2:a.x2,y2:a.y2,stroke:'transparent','stroke-width':24,class:'arrow-hit'});
-   hit.dataset.id=a.id;hit.addEventListener('pointerdown',e=>startArrowInteraction(e,a,'arrow-move'));lines.append(hit);
-   for(const [kind,x,y] of [['arrow-start',a.x1,a.y1],['arrow-end',a.x2,a.y2]]){
-    const grip=svgElement('circle',{cx:x,cy:y,r:9,class:'arrow-control',visibility:selected===a.id?'visible':'hidden'});
-    grip.dataset.id=a.id;grip.addEventListener('pointerdown',e=>startArrowInteraction(e,a,kind));lines.append(grip);
+   const hit=svgElement('path',{d,stroke:'transparent','stroke-width':24,fill:'none',class:'arrow-hit'});
+   hit.dataset.id=ar.id;hit.addEventListener('pointerdown',e=>startArrowInteraction(e,ar,'arrow-move'));lines.append(hit);
+   for(const [kind,x,y] of [['arrow-start',ar.x1,ar.y1],['arrow-end',ar.x2,ar.y2]]){
+    const grip=svgElement('circle',{cx:x,cy:y,r:9,class:'arrow-control',visibility:selected===ar.id?'visible':'hidden'});
+    grip.dataset.id=ar.id;grip.addEventListener('pointerdown',e=>startArrowInteraction(e,ar,kind));lines.append(grip);
    }
+   const mid=arrowMid(ar),bend=svgElement('circle',{cx:mid.x,cy:mid.y,r:10,class:'arrow-bend-handle',visibility:selected===ar.id?'visible':'hidden'});
+   bend.dataset.id=ar.id;bend.addEventListener('pointerdown',e=>startArrowInteraction(e,ar,'arrow-bend'));lines.append(bend);
   }
  }
  const defs=svgElement('defs');
@@ -428,10 +471,10 @@ function pointerDown(e){
  const isTouch=e.pointerType==='touch';
  if(locked){interaction={kind:'pan',x:e.clientX,y:e.clientY,ox,oy,pointerId:e.pointerId,isTouch};viewport.classList.add('panning');return}
  const p=toWorld(e.clientX,e.clientY);
- if(tool==='arrow'){
-  if(isTouch){interaction={kind:'pending-arrow',start:p,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY};return}
+ if(tool==='arrow'||tool==='curved-arrow'){
+  if(isTouch){interaction={kind:'pending-arrow',start:p,pointerId:e.pointerId,startX:e.clientX,startY:e.clientY,curve:tool==='curved-arrow'?115:0};return}
   checkpoint();const a={id:uid(),x1:p.x,y1:p.y,x2:p.x+1,y2:p.y+1,color:'#394c78',width:3};
-  arrows.push(a);interaction={kind:'arrow-create',id:a.id,pointerId:e.pointerId,start:p,checkpointed:true};drawLines();return
+  a.curve=tool==='curved-arrow'?115:0;arrows.push(a);interaction={kind:'arrow-create',id:a.id,pointerId:e.pointerId,start:p,checkpointed:true};drawLines();return
  }
  if(tool==='pen'){
   if(isTouch){interaction={kind:'pending-draw',pointerId:e.pointerId,start:p,startX:e.clientX,startY:e.clientY};return}
@@ -460,7 +503,7 @@ function pointerMove(e){
  if(d.kind==='pending-arrow'){
   if(Math.hypot(e.clientX-d.startX,e.clientY-d.startY)<10)return;
   checkpoint();const a={id:uid(),x1:d.start.x,y1:d.start.y,x2:d.start.x+1,y2:d.start.y+1,color:'#394c78',width:3};
-  arrows.push(a);interaction={kind:'arrow-create',id:a.id,pointerId:e.pointerId,start:d.start,checkpointed:true,isTouch:true};
+  a.curve=d.curve||0;arrows.push(a);interaction={kind:'arrow-create',id:a.id,pointerId:e.pointerId,start:d.start,checkpointed:true,isTouch:true};
   drawLines();return;
  }
  if(d.kind.startsWith('arrow-')){
@@ -473,6 +516,7 @@ function pointerMove(e){
   if(d.kind==='arrow-create'||d.kind==='arrow-end'){a.x2=d.kind==='arrow-create'?p.x:d.x2+dx;a.y2=d.kind==='arrow-create'?p.y:d.y2+dy}
   else if(d.kind==='arrow-start'){a.x1=d.x1+dx;a.y1=d.y1+dy}
   else if(d.kind==='arrow-move'){a.x1=d.x1+dx;a.y1=d.y1+dy;a.x2=d.x2+dx;a.y2=d.y2+dy}
+  else if(d.kind==='arrow-bend'){const vx=a.x2-a.x1,vy=a.y2-a.y1,len=Math.max(1,Math.hypot(vx,vy));a.curve=Math.max(-420,Math.min(420,Math.round(2*((p.x-(a.x1+a.x2)/2)*(-vy/len)+(p.y-(a.y1+a.y2)/2)*(vx/len)))));$('#arrow-bend').value=a.curve}
   drawLines();return;
  }
  if(d.kind==='pending-draw'){
@@ -510,7 +554,7 @@ function pointerUp(e){
  }
  if(d.kind==='pending-link'&&!locked){completeNodeLink(d.id);return}
  if(d.kind==='pending-arrow'&&!locked){
-  checkpoint();const a={id:uid(),x1:d.start.x,y1:d.start.y,x2:d.start.x+160,y2:d.start.y+80,color:'#394c78',width:3};
+  checkpoint();const a={id:uid(),x1:d.start.x,y1:d.start.y,x2:d.start.x+160,y2:d.start.y+80,color:'#394c78',width:3,curve:d.curve||0};
   arrows.push(a);render();setTool('select');selectNode(a.id);scheduleSave();return;
  }
  if(d.kind==='arrow-create'){
@@ -550,7 +594,7 @@ async function importProject(file){
 function placeForFile(i,loc){const p=loc||centerWorld();return{x:p.x+(i%3)*370-140,y:p.y+Math.floor(i/3)*330-100}}
 async function importFiles(fileList,point){if(locked){toast('Destrave o quadro para importar arquivos.');return;}const files=[...fileList];if(!files.length)return;for(let i=0;i<files.length;i++){const f=files[i],p=placeForFile(i,point);try{if(/\.quadro\.json$/i.test(f.name)){await importProject(f);continue}if(f.type.startsWith('image/')){const url=await readAsDataURL(f);let w=340,h=250;try{let img=new Image();img.src=url;await img.decode();h=Math.max(120,Math.min(600,Math.round(340*img.naturalHeight/img.naturalWidth)))}catch(e){}addNode('file',p.x,p.y,{w,h:h+29,preview:'image',src:url,mime:f.type,name:f.name})}else if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){if(!window.pdfjsLib){const src=f.size<8e6?await readAsDataURL(f):null;addNode('file',p.x,p.y,{name:f.name,mime:'application/pdf',src,note:'Visualização de PDF indisponível. Baixe o arquivo.'});toast('Abra com internet para habilitar a visualização de PDFs.');continue}const data=new Uint8Array(await readAsBuffer(f));pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';let pdf=await pdfjsLib.getDocument({data}).promise;let max=Math.min(pdf.numPages,12);checkpoint();toast('Preparando PDF em alta resolução…');let rowTop=p.y,rowHeight=0;for(let pageNumber=1;pageNumber<=max;pageNumber++){let page=await pdf.getPage(pageNumber);let initial=page.getViewport({scale:1});const renderScale=Math.min(3.5,1900/initial.width,Math.sqrt(4400000/(initial.width*initial.height)));let vp=page.getViewport({scale:renderScale});let canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.ceil(vp.width));canvas.height=Math.max(1,Math.ceil(vp.height));const context=canvas.getContext('2d',{alpha:false});context.fillStyle='#ffffff';context.fillRect(0,0,canvas.width,canvas.height);await page.render({canvasContext:context,viewport:vp}).promise;let src=canvas.toDataURL('image/png'),mime='image/png';if(src.length>3000000){src=canvas.toDataURL('image/jpeg',.96);mime='image/jpeg'}canvas.width=0;canvas.height=0;const w=360,h=Math.max(100,Math.round(w*initial.height/initial.width)+29),col=(pageNumber-1)%3;if(col===0&&pageNumber>1){rowTop+=rowHeight+30;rowHeight=0}let px=p.x+col*390,py=rowTop;nodes.push(makeNode('file',px,py,{name:`${f.name} · página ${pageNumber}/${pdf.numPages}`,w,h,preview:'image',src,mime}));rowHeight=Math.max(rowHeight,h)}render();scheduleSave();toast(`PDF em alta definição: ${max} de ${pdf.numPages} páginas importadas${max<pdf.numPages?' (limite de 12)':''}.`)}else if(/\.docx$/i.test(f.name)&&window.mammoth){const buf=await readAsBuffer(f);const res=await mammoth.extractRawText({arrayBuffer:buf});const content=res.value||'Documento sem texto extraível';addNode('note',p.x,p.y,{text:content.slice(0,15000),w:500,h:340,color:'#ffffff'});toast('Texto do DOCX inserido como nota editável.')}else if(f.type.startsWith('text/')||/\.(txt|md|csv|html)$/i.test(f.name)){const content=await readAsText(f);addNode('note',p.x,p.y,{text:content.slice(0,20000),w:490,h:320,color:'#ffffff'});toast('Texto importado e editável.')}else{const src=f.size<7e6?await readAsDataURL(f):null;addNode('file',p.x,p.y,{name:f.name,mime:f.type||f.name.split('.').pop(),src,note:src?'Clique para baixar o anexo':'Arquivo grande: referência somente nesta versão'});if(!src)toast('Arquivo grande demais para guardar no navegador.')}}catch(e){console.error('Importação:',f.name,e);toast(`Não foi possível importar ${f.name}.`)}}}
 function deleteAll(){if(!confirm('Apagar todos os elementos deste quadro? Exporte um backup antes de confirmar.'))return;checkpoint();nodes=[];connectors=[];paths=[];arrows=[];selected=null;render();scheduleSave()}
-async function exportPng(){if(!nodes.length&&!paths.length&&!arrows.length)return toast('Adicione algum elemento primeiro.');let minX=Math.min(0,...nodes.map(n=>n.x))-45,minY=Math.min(0,...nodes.map(n=>n.y))-45,maxX=Math.max(100,...nodes.map(n=>n.x+n.w))+45,maxY=Math.max(100,...nodes.map(n=>n.y+n.h))+45;let width=maxX-minX,height=maxY-minY,scale=Math.min(2,Math.sqrt(16000000/(width*height)));let c=document.createElement('canvas');c.width=Math.ceil(width*scale);c.height=Math.ceil(height*scale);let ctx=c.getContext('2d');ctx.scale(scale,scale);ctx.fillStyle='#f6f8fc';ctx.fillRect(0,0,width,height);ctx.translate(-minX,-minY);ctx.strokeStyle='#71809c';ctx.lineWidth=3;for(const link of connectors){let a=nodes.find(n=>n.id===link.from),b=nodes.find(n=>n.id===link.to);if(a&&b){ctx.beginPath();ctx.moveTo(a.x+a.w/2,a.y+a.h/2);ctx.lineTo(b.x+b.w/2,b.y+b.h/2);ctx.stroke()}}for(const a of arrows){ctx.strokeStyle=a.color||'#394c78';ctx.fillStyle=a.color||'#394c78';ctx.lineWidth=a.width||3;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(a.x1,a.y1);ctx.lineTo(a.x2,a.y2);ctx.stroke();const angle=Math.atan2(a.y2-a.y1,a.x2-a.x1),len=15,half=7;const bx=a.x2-len*Math.cos(angle),by=a.y2-len*Math.sin(angle);ctx.beginPath();ctx.moveTo(a.x2,a.y2);ctx.lineTo(bx-half*Math.sin(angle),by+half*Math.cos(angle));ctx.lineTo(bx+half*Math.sin(angle),by-half*Math.cos(angle));ctx.closePath();ctx.fill()}
+async function exportPng(){if(!nodes.length&&!paths.length&&!arrows.length)return toast('Adicione algum elemento primeiro.');let minX=Math.min(0,...nodes.map(n=>n.x))-45,minY=Math.min(0,...nodes.map(n=>n.y))-45,maxX=Math.max(100,...nodes.map(n=>n.x+n.w))+45,maxY=Math.max(100,...nodes.map(n=>n.y+n.h))+45;let width=maxX-minX,height=maxY-minY,scale=Math.min(2,Math.sqrt(16000000/(width*height)));let c=document.createElement('canvas');c.width=Math.ceil(width*scale);c.height=Math.ceil(height*scale);let ctx=c.getContext('2d');ctx.scale(scale,scale);ctx.fillStyle='#f6f8fc';ctx.fillRect(0,0,width,height);ctx.translate(-minX,-minY);ctx.strokeStyle='#71809c';ctx.lineWidth=3;for(const link of connectors){let a=nodes.find(n=>n.id===link.from),b=nodes.find(n=>n.id===link.to);if(a&&b){ctx.beginPath();ctx.moveTo(a.x+a.w/2,a.y+a.h/2);ctx.lineTo(b.x+b.w/2,b.y+b.h/2);ctx.stroke()}}for(const a of arrows){ctx.strokeStyle=a.color||'#394c78';ctx.fillStyle=a.color||'#394c78';ctx.lineWidth=a.width||3;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(a.x1,a.y1);const c=arrowControl(a);ctx.quadraticCurveTo(c.x,c.y,a.x2,a.y2);ctx.stroke();const angle=Math.atan2(a.y2-c.y,a.x2-c.x),len=15,half=7;const bx=a.x2-len*Math.cos(angle),by=a.y2-len*Math.sin(angle);ctx.beginPath();ctx.moveTo(a.x2,a.y2);ctx.lineTo(bx-half*Math.sin(angle),by+half*Math.cos(angle));ctx.lineTo(bx+half*Math.sin(angle),by-half*Math.cos(angle));ctx.closePath();ctx.fill()}
  for(const path of paths){ctx.strokeStyle=path.color||'#344f81';ctx.lineWidth=path.width||3;ctx.lineCap='round';ctx.beginPath();path.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke()}for(const n of nodes){ctx.fillStyle=n.color||'#fff';ctx.strokeStyle='#d5dbe7';ctx.lineWidth=1;ctx.beginPath();if(n.type==='ellipse')ctx.ellipse(n.x+n.w/2,n.y+n.h/2,n.w/2,n.h/2,0,0,Math.PI*2);else ctx.roundRect(n.x,n.y,n.w,n.h,8);ctx.fill();ctx.stroke();if(n.type==='file'&&n.preview==='image'&&n.src){try{const img=new Image();img.src=n.src;await img.decode();ctx.drawImage(img,n.x+3,n.y+30,n.w-6,n.h-33)}catch(e){}}else if(['note','text'].includes(n.type)){ctx.fillStyle='#233047';ctx.font=n.type==='text'?'600 21px sans-serif':'16px sans-serif';const maxW=n.w-27;let yy=n.y+47;for(let paragraph of String(n.text||'').split('\n')){let words=paragraph.split(' '),line='';for(let word of words){let next=line?line+' '+word:word;if(ctx.measureText(next).width>maxW&&line){ctx.fillText(line,n.x+14,yy);yy+=24;line=word}else line=next;if(yy>n.y+n.h-15)break}if(yy>n.y+n.h-15)break;ctx.fillText(line,n.x+14,yy);yy+=24}}else if(n.type==='file'){ctx.fillStyle='#56637c';ctx.font='14px sans-serif';ctx.fillText((n.name||'Arquivo').slice(0,35),n.x+15,n.y+56)}}const url=c.toDataURL('image/png');downloadData(url,'quadro-livre.png');toast('Imagem PNG exportada.')}
 $('#welcome-close').onclick=()=>{$('#welcome-dialog').close();localStorage.setItem(OPENED_KEY,'1')};$('#welcome-dialog').addEventListener('close',()=>localStorage.setItem(OPENED_KEY,'1'));
 $$('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));$('#insert-files').onclick=$('#import-file').onclick=()=>{setToolsOpen(false);input.click()};$('#start-note').onclick=()=>{let p=centerWorld();addNode('note',p.x-110,p.y-80)};input.addEventListener('change',async e=>{await importFiles(input.files);input.value=''});
@@ -558,7 +602,7 @@ $('#export-file').onclick=exportProject;$('#zoom-in').onclick=()=>zoomCenter(1.2
 $('#node-color').oninput=e=>{const n=nodes.find(n=>n.id===selected);if(locked)return;const a=arrows.find(x=>x.id===selected);if(a){a.color=e.target.value;drawLines();scheduleSave();return}if(!n)return;n.color=e.target.value;const el=$(`.node[data-id="${n.id}"]`);if(el)el.style.background=n.color;scheduleSave()};$('#node-width').oninput=e=>{const n=nodes.find(n=>n.id===selected);if(locked)return;const a=arrows.find(x=>x.id===selected);if(a){a.width=Number(e.target.value);$('#width-label').textContent=a.width+' px (traço)';drawLines();scheduleSave();return}if(!n)return;n.w=Number(e.target.value);$('#width-label').textContent=n.w+' px';const el=$(`.node[data-id="${n.id}"]`);if(el)el.style.width=n.w+'px';drawLines();scheduleSave()};$('#duplicate-node').onclick=duplicateSelected;$('#delete-node').onclick=deleteSelected;title.addEventListener('input',scheduleSave);
 viewport.addEventListener('pointerdown',pointerDown);window.addEventListener('pointermove',pointerMove);window.addEventListener('pointerup',pointerUp);window.addEventListener('pointercancel',pointerUp);
 viewport.addEventListener('wheel',e=>{if(e.target.closest('.node-text'))return;e.preventDefault();if(e.ctrlKey||e.metaKey){zoomAt(Math.exp(-e.deltaY*.008),e.clientX,e.clientY)}else if(e.altKey){zoomAt(Math.exp(-e.deltaY*.003),e.clientX,e.clientY)}else{ox-=e.deltaX;oy-=e.deltaY;updateCamera();scheduleSave()}},{passive:false});
-window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,[contenteditable]'))return;const mod=e.ctrlKey||e.metaKey;if(locked){if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject()}else if(e.key==='Delete'||e.key==='Backspace'||(mod&&['z','y','d'].includes(e.key.toLowerCase())))e.preventDefault();return;}if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return}if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject();return}if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected();return}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();return}if(e.key==='Escape'){closeFolders();setToolsOpen(false);selected=null;selectNode(null);setTool('select');return}if(e.code==='Space'){spaceHeld=true;viewport.classList.add('hand');e.preventDefault();return}const short={v:'select',h:'hand',n:'note',t:'text',r:'rect',o:'ellipse',p:'pen',a:'arrow',l:'link'};if(!mod&&short[e.key.toLowerCase()])setTool(short[e.key.toLowerCase()])});window.addEventListener('keyup',e=>{if(e.code==='Space'){spaceHeld=false;viewport.classList.toggle('hand',tool==='hand')}});
+window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,[contenteditable]'))return;const mod=e.ctrlKey||e.metaKey;if(locked){if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject()}else if(e.key==='Delete'||e.key==='Backspace'||(mod&&['z','y','d'].includes(e.key.toLowerCase())))e.preventDefault();return;}if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return}if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject();return}if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected();return}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();return}if(e.key==='Escape'){closeFolders();setToolsOpen(false);selected=null;selectNode(null);setTool('select');return}if(e.code==='Space'){spaceHeld=true;viewport.classList.add('hand');e.preventDefault();return}const short={v:'select',h:'hand',n:'note',t:'text',r:'rect',o:'ellipse',p:'pen',a:'arrow',c:'curved-arrow',l:'link'};if(!mod&&short[e.key.toLowerCase()])setTool(short[e.key.toLowerCase()])});window.addEventListener('keyup',e=>{if(e.code==='Space'){spaceHeld=false;viewport.classList.toggle('hand',tool==='hand')}});
 viewport.addEventListener('dragenter',e=>{e.preventDefault();document.body.classList.add('dragging-files')});viewport.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy'});viewport.addEventListener('dragleave',e=>{if(!viewport.contains(e.relatedTarget))document.body.classList.remove('dragging-files')});viewport.addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('dragging-files');if(locked){toast('Destrave o quadro para importar arquivos.');return;}importFiles(e.dataTransfer.files,toWorld(e.clientX,e.clientY))});
 window.addEventListener('beforeunload',()=>{if(saveTimer)clearTimeout(saveTimer)});
 // Pinça estável: amortecimento, zona neutra e âncora fixa no ponto entre os dedos.
@@ -578,7 +622,7 @@ function cancelInteractionForPinch(){
  }else if(d.kind.startsWith('arrow-')&&d.isTouch){
   const a=arrows.find(x=>x.id===d.id);
   if(a){if(d.kind==='arrow-create')arrows=arrows.filter(x=>x.id!==a.id);
-   else {a.x1=d.x1;a.y1=d.y1;a.x2=d.x2;a.y2=d.y2}}
+   else {a.x1=d.x1;a.y1=d.y1;a.x2=d.x2;a.y2=d.y2;a.curve=d.curve}}
   if(d.checkpointed){history.pop();future=d.previousFuture||[];updateUndoButtons()}
   drawLines();
  }else if(d.kind==='draw'&&d.path){
