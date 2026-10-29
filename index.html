@@ -306,6 +306,16 @@ body.branch-editor-open #inspector{display:none}
 .tree-card .tree-actions .tree-edit{font-size:13px;width:27px}
 .tree-card.active-branch{outline:3px solid #698af3;outline-offset:2px}
 .tree-card .branch-attachment:focus-visible{outline:2px solid #5277e8}
+/* Garante que cada subtópico use sua própria cor e tamanho, mesmo após estilos globais. */
+.node.template .tree-card.root .branch-label,
+.node.template .tree-card:not(.root) .branch-label{font-size:var(--branch-size,14px);color:inherit}
+.node.template .tree-card.root .branch-detail,
+.node.template .tree-card:not(.root) .branch-detail{font-size:calc(var(--branch-size,14px)*.88);color:inherit}
+.node.template .tree-card .branch-note,.node.template .tree-card .branch-hyperlink,
+.node.template .tree-card .branch-attachment{color:inherit}
+.branch-color-swatches{display:flex;flex-wrap:wrap;gap:7px;margin:8px 0 4px}
+.branch-color-swatches button{width:29px;height:29px;border-radius:7px;border:1px solid #b8c6dc;box-shadow:0 2px 5px #27324b15}
+.branch-color-swatches button:focus-visible{outline:3px solid #526ff0}
 @media(max-width:760px){.branch-editor{top:70px;right:7px;bottom:8px;width:min(330px,calc(100vw - 14px))}.tree-card{max-height:320px}}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -403,6 +413,7 @@ body.branch-editor-open #inspector{display:none}
   <label for="branch-edit-title">Título</label><input id="branch-edit-title" type="text" placeholder="Título ou cargo" maxlength="240">
   <label for="branch-edit-detail">Descrição e informações</label><textarea id="branch-edit-detail" rows="4" placeholder="Escreva aqui as informações deste subtópico"></textarea>
   <div class="branch-editor-duo"><label>Fundo<input type="color" id="branch-edit-bg" value="#ffffff"></label><label>Texto<input type="color" id="branch-edit-fg" value="#243047"></label></div>
+  <div id="branch-color-swatches" class="branch-color-swatches" aria-label="Cores prontas para o cartão"></div>
   <label for="branch-edit-font-size">Tamanho da fonte <output id="branch-edit-size-out">14 px</output></label><input type="range" id="branch-edit-font-size" min="10" max="26" step="1" value="14">
   <label for="branch-edit-width">Largura do quadro <output id="branch-edit-width-out">240 px</output></label><input type="range" id="branch-edit-width" min="200" max="360" step="10" value="240">
   <div class="branch-extra-head"><strong>Conteúdo adicional</strong><div><button type="button" id="branch-add-note">+ Texto</button><button type="button" id="branch-add-link">+ Link</button><button type="button" id="branch-add-file">+ Arquivo</button></div></div>
@@ -1010,6 +1021,12 @@ branchEditableInput('branch-edit-bg','bgColor');
 branchEditableInput('branch-edit-fg','textColor');
 branchEditableInput('branch-edit-font-size','fontSize',v=>Math.max(10,Math.min(26,Number(v)||14)));
 branchEditableInput('branch-edit-width','cardWidth',v=>Math.max(200,Math.min(360,Number(v)||245)));
+const branchSwatches=['#ffffff','#fff1b8','#ffd4df','#d8c9ff','#cae5fc','#bcead6','#d8f2f4','#e8e8e8','#3659ad','#30465c','#5c397f','#f5ca90'];
+for(const color of branchSwatches){
+ const button=document.createElement('button');button.type='button';button.style.backgroundColor=color;button.title='Cor '+color;button.setAttribute('aria-label','Cor de fundo '+color);
+ button.onclick=()=>{const ref=currentBranch();if(!ref||locked)return;checkpoint();changeBranchValue('bgColor',color,{rerender:false});$('#branch-edit-bg').value=color};
+ $('#branch-color-swatches').append(button)
+}
 $('#branch-editor-close').onclick=closeBranchEditor;
 function refreshBranchExtras(){
  const target=currentBranch(),wrap=$('#branch-extra-list');wrap.replaceChildren();
