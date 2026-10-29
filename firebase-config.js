@@ -1,11 +1,9 @@
-/* Configuração pública do SDK Firebase. Não inserir chave service account/admin.
-   Até este arquivo ser preenchido a versão publicada permanece local. */
-window.QUADRO_FIREBASE_CONFIG = null;
-// Exemplo após criar aplicativo Web no console Firebase:
-// window.QUADRO_FIREBASE_CONFIG = {
-//   apiKey: "SUA_WEB_API_KEY_PUBLICAVEL",
-//   authDomain: "SEU-PROJETO.firebaseapp.com",
-//   projectId: "SEU-PROJETO",
-//   storageBucket: "SEU-PROJETO.firebasestorage.app",
-//   appId: "1:NUMERO:web:IDENTIFICADOR"
-// };
+/* Configuração pública do SDK Firebase (não é segredo). Não inserir chave service account/admin.
+   Cloud Storage não está ativado (plano Spark): storageBucket intencionalmente ausente. */
+window.QUADRO_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBOqwTmPEFoK8kiITrvZ0ZMdeELWDcVRXU",
+  authDomain: "sample-firebase-ai-app-1d935.firebaseapp.com",
+  projectId: "sample-firebase-ai-app-1d935",
+  messagingSenderId: "393916419939",
+  appId: "1:393916419939:web:e0a956f47b33cb4b750d56"
+};
