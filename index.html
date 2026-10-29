@@ -589,7 +589,10 @@ const ctxInput={bg:$('#context-bg'),fg:$('#context-fg'),font:$('#context-font'),
 function contextObject(){
  if(!contextTarget)return null;
  const node=nodes.find(n=>n.id===contextTarget.nodeId);
- if(!node)return null;
+ if(!node){
+  const arrow=arrows.find(a=>a.id===contextTarget.nodeId);
+  return arrow?{kind:'arrow',arrow}:null
+ }
  if(contextTarget.branchId){
   const item=node.tree?.find(t=>t.id===contextTarget.branchId);
   return item?{kind:'branch',node,item}:null
@@ -598,6 +601,7 @@ function contextObject(){
 }
 function contextRect(){
  const obj=contextObject();if(!obj)return null;
+ if(obj.kind==='arrow')return $$('.arrow-line').find(el=>el.dataset.id===obj.arrow.id)?.getBoundingClientRect();
  if(obj.kind==='branch')return $$('.tree-card').find(el=>el.dataset.nodeId===obj.node.id&&el.dataset.branchId===obj.item.id)?.getBoundingClientRect();
  return $$('.node').find(el=>el.dataset.id===obj.node.id)?.getBoundingClientRect()
 }
@@ -613,6 +617,7 @@ function placeContextToolbar(){
  toolbar.style.top=Math.max(74,Math.min(window.innerHeight-toolbar.offsetHeight-8,top))+'px';
 }
 function contextValue(obj,key){
+ if(obj.kind==='arrow')return {bg:obj.arrow.color||'#394c78',fg:'#243047',font:16,width:obj.arrow.width||3,height:0}[key];
  if(obj.kind==='branch'){
   const root=obj.item.parentId===null;
   return {bg:obj.item.bgColor||(root?'#3659ad':'#ffffff'),fg:obj.item.fontColor||(root?'#ffffff':'#243047'),font:obj.item.fontSize||13,width:obj.item.cardWidth||(root?185:162),height:obj.item.cardHeight||67}[key];
@@ -626,16 +631,20 @@ function updateContextToolbar(){
  for(const key of ['bg','fg','font','width','height']){
   if(document.activeElement!==ctxInput[key])ctxInput[key].value=contextValue(obj,key);
  }
- const isArrow=obj.kind==='node'&&obj.node.type==='arrow';
- ctxInput.fg.disabled=obj.kind==='node'&&!['note','text','template'].includes(obj.node.type);
+ const isArrow=obj.kind==='arrow';
+ ctxInput.fg.disabled=isArrow||(obj.kind==='node'&&!['note','text','template'].includes(obj.node.type));
  ctxInput.font.disabled=ctxInput.fg.disabled;
- ctxInput.height.disabled=false;
- ctxInput.width.disabled=false;
+ ctxInput.height.disabled=isArrow;
+ ctxInput.width.min=isArrow?'1':obj.kind==='branch'?'120':'120';
+ ctxInput.width.max=isArrow?'16':obj.kind==='branch'?'420':'1600';
+ ctxInput.width.title=isArrow?'Espessura da seta':'Largura do quadrinho';
+ ctxInput.width.parentElement.firstChild.textContent=isArrow?'Traço ':'Larg. ';
+ ctxInput.bg.parentElement.firstChild.textContent=isArrow?'Seta ':'Fundo ';
  $('#context-add-child').hidden=obj.kind!=='branch';
  $('#context-duplicate').hidden=obj.kind==='branch';
- $('#context-link').hidden=obj.kind==='branch';
- $('#context-move').hidden=obj.kind==='branch';
- $('#context-delete').textContent=obj.kind==='branch'?'Excluir subtópico':'Excluir elemento';
+ $('#context-link').hidden=obj.kind!=='node';
+ $('#context-move').hidden=obj.kind!=='node';
+ $('#context-delete').textContent=obj.kind==='branch'?'Excluir subtópico':obj.kind==='arrow'?'Excluir seta':'Excluir elemento';
  $$('.tree-card').forEach(el=>el.classList.toggle('context-selected',obj.kind==='branch'&&el.dataset.nodeId===obj.node.id&&el.dataset.branchId===obj.item.id));
  requestAnimationFrame(placeContextToolbar);
 }
@@ -655,6 +664,11 @@ function applyContextChange(key){
  if(key==='font'&&(!Number.isFinite(number)||number<10||number>72))return updateContextToolbar();
  if((key==='width'||key==='height')&&(!Number.isFinite(number)||number<50||number>1600))return updateContextToolbar();
  checkpoint();
+ if(obj.kind==='arrow'){
+  if(key==='bg')obj.arrow.color=raw;
+  if(key==='width')obj.arrow.width=Math.max(1,Math.min(16,Math.round(number)));
+  drawLines();updateContextToolbar();scheduleSave();return;
+ }
  if(obj.kind==='branch'){
   const item=obj.item;
   if(key==='bg')item.bgColor=raw;
