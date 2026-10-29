@@ -189,7 +189,7 @@ async function authorize(request,env,authorization) {
       const approval=await oauth.approveConsent(request,handle,{scope:selected});
       const {redirectTo}=await oauth.completeAuthorization({
         request:approval.request,userId:identity.userId,metadata:{},
-        scope:selected,
+        scope:approval.request.scope,
         props:{userId:identity.userId,email:identity.email,firebaseRefreshToken:refreshToken}
       });
       approval.headers.set('Location',redirectTo);
@@ -234,3 +234,6 @@ export default {
   return authorization.fetch(request,env,ctx);
  }
 };
+
+// Exportações restritas para testes do contrato MCP, sem credenciais nem dados.
+export { mcpHandler, TOOLS };
