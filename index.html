@@ -317,6 +317,88 @@ body.branch-editor-open #inspector{display:none}
 .branch-color-swatches button{width:29px;height:29px;border-radius:7px;border:1px solid #b8c6dc;box-shadow:0 2px 5px #27324b15}
 .branch-color-swatches button:focus-visible{outline:3px solid #526ff0}
 @media(max-width:760px){.branch-editor{top:70px;right:7px;bottom:8px;width:min(330px,calc(100vw - 14px))}.tree-card{max-height:320px}}
+
+/* Correção visual v1.8.1: os controles ocupam uma linha própria, sem sobrepor os títulos. */
+.node.template .tree-card{
+ display:flex;
+ flex-direction:column;
+ justify-content:flex-start;
+ align-items:stretch;
+ box-sizing:border-box;
+ overflow:auto;
+ max-height:540px;
+ padding:11px 13px 14px;
+}
+.node.template .tree-card .tree-actions,
+.node.template .tree-card.root .tree-actions{
+ position:relative;
+ top:auto;
+ right:auto;
+ left:auto;
+ float:none;
+ display:flex;
+ flex:0 0 auto;
+ width:100%;
+ min-height:38px;
+ height:38px;
+ align-items:center;
+ justify-content:flex-end;
+ gap:7px;
+ margin:0 0 10px;
+ padding:0 0 7px;
+ border-bottom:1px solid currentColor;
+ border-bottom-color:color-mix(in srgb,currentColor 17%,transparent);
+ border-radius:0;
+ background:transparent;
+ z-index:1;
+}
+.node.template .tree-card .tree-actions button{
+ display:grid;
+ place-items:center;
+ flex:0 0 28px;
+ width:28px;
+ height:28px;
+ min-width:28px;
+ line-height:1;
+ padding:0;
+ font-size:18px;
+ font-weight:650;
+ border-radius:8px;
+ border:1px solid #aebfe6;
+ background:#ffffff;
+ color:#405cb1;
+ box-shadow:0 1px 3px #19305a1a;
+ cursor:pointer;
+}
+.node.template .tree-card .tree-actions button:hover,
+.node.template .tree-card .tree-actions button:focus-visible{
+ background:#e9efff;
+ outline:2px solid #6684e4;
+ outline-offset:1px;
+}
+.node.template .tree-card .tree-actions button.tree-color{
+ border-radius:50%;
+ border:2px solid #d8e1f5;
+ box-shadow:inset 0 0 0 2px #ffffff;
+}
+.node.template .tree-card .branch-label,
+.node.template .tree-card .branch-detail{
+ display:block;
+ float:none;
+ position:relative;
+ width:100%;
+ z-index:0;
+ padding:0;
+ margin-left:0;
+}
+.node.template .tree-card .branch-label{font-weight:750;min-height:20px;margin-top:1px;margin-bottom:8px}
+.node.template .tree-card .branch-detail{min-height:22px;margin-top:0;opacity:.9}
+.node.template .tree-card .branch-body{width:100%;flex:0 0 auto}
+.node.template .tree-card .tree-actions~.branch-label{clear:both}
+@media(max-width:760px){
+ .node.template .tree-card .tree-actions{height:41px;min-height:41px}
+ .node.template .tree-card .tree-actions button{height:31px;width:31px;flex-basis:31px}
+}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -436,7 +518,7 @@ body.branch-editor-open #inspector{display:none}
   <dialog id="slides-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Apresentação</strong><button type="button" class="icon-button" id="slides-close" aria-label="Fechar apresentação">×</button></div><div class="slide-display"><div id="slide-counter"></div><h2 id="slide-heading"></h2><p id="slide-description"></p></div><div class="slide-controls"><button class="secondary" id="slide-previous">Anterior</button><button class="primary" id="slide-next">Próximo</button></div></div></dialog>
   <dialog id="poll-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Atividade</strong><button type="button" class="icon-button" id="poll-close" aria-label="Fechar atividade">×</button></div><h2 id="poll-question"></h2><div id="poll-options"></div><p class="small-muted">Votação local neste navegador. Não há participação simultânea pela internet.</p></div></dialog>
   <dialog id="welcome-dialog"><div class="dialog-body"><div class="dialog-mark">Q</div><h2>Seu quadro está pronto</h2><p>Crie notas, mova elementos, importe documentos e organize tudo em um espaço infinito.</p><p class="privacy-note"><strong>Privacidade:</strong> nesta versão, o salvamento é feito no navegador deste dispositivo. Para usar o mesmo quadro em outro aparelho, exporte e importe o arquivo do projeto. A sincronização em nuvem ainda não está ativada.</p><button class="primary" id="welcome-close">Começar a criar</button></div></dialog>
-<script>/* Quadro Livre v1.8.0 - editor de quadro infinito, sem servidor e sem rastreamento */
+<script>/* Quadro Livre v1.8.1 - editor de quadro infinito, sem servidor e sem rastreamento */
 (() => {
 'use strict';
 const $ = (q, el=document) => el.querySelector(q);
@@ -992,7 +1074,11 @@ function changeBranchValue(key,value,{rerender=false}={}){
  if(card){
   if(key==='label'){$('.branch-label',card).textContent=value}
   if(key==='detail'){$('.branch-detail',card).textContent=value}
-  if(key==='bgColor')card.style.background=value;
+  if(key==='bgColor'){
+   card.style.backgroundColor=value;
+   const swatch=$('.tree-actions .tree-color',card);
+   if(swatch)swatch.style.backgroundColor=value;
+  }
   if(key==='textColor')card.style.color=value;
   if(key==='fontSize')card.style.setProperty('--branch-size',value+'px');
   if(key==='cardWidth')card.style.width=value+'px';
@@ -1121,13 +1207,14 @@ function renderTreeTemplate(el,n){
  function estimatedHeight(item){
   const font=branchFontSize(item),w=cardW(item),approx=Math.max(10,(w-35)/(font*.59));
   const lines=value=>String(value||'').split('\n').reduce((sum,line)=>sum+Math.max(1,Math.ceil(line.length/approx)),0);
-  let height=34+lines(item.label)*(font*1.37)+lines(item.detail)*(font*.88*1.42)+16;
+  // Reservar linha independente para ações + respiro antes do título.
+  let height=90+lines(item.label)*(font*1.37)+lines(item.detail)*(font*.88*1.42);
   for(const b of item.blocks||[]){
    if(b.type==='text')height+=Math.min(145,15+lines(b.text)*(font*.82*1.45));
    if(b.type==='link')height+=37;
    if(b.type==='file')height+=b.mime?.startsWith('image/')?150:39;
   }
-  return Math.ceil(Math.max(103,Math.min(380,height)));
+  return Math.ceil(Math.max(142,Math.min(535,height)));
  }
  const cardHeights=new Map(n.tree.map(item=>[item.id,estimatedHeight(item)]));
  const positions=new Map(),sizeX=398,gapY=30;
@@ -1225,6 +1312,16 @@ function renderTreeTemplate(el,n){
   const description=document.createElement('div');description.className='branch-detail';
   description.textContent=item.detail||'';makeEditableField(description,item,'detail',n.id);
   card.append(name,description);
+  // Ao terminar a edição, recalcula o tamanho de cada cartão e suas conexões.
+  for(const field of [name,description]){
+   field.addEventListener('blur',()=>{
+    if(locked)return;
+    const current=branchEditorTarget;
+    requestAnimationFrame(()=>{
+     if(nodes.some(x=>x.id===n.id)){render();if(current&&current.nodeId===n.id){$$('.tree-card').forEach(c=>c.classList.toggle('active-branch',c.dataset.branchId===current.itemId))}}
+    });
+   });
+  }
   const blocks=document.createElement('div');blocks.className='branch-body';
   for(const block of item.blocks||[]){
    if(block.type==='text'){
@@ -1250,6 +1347,20 @@ function renderTreeTemplate(el,n){
    const actions=document.createElement('div');actions.className='tree-actions';
    const edit=document.createElement('button');edit.type='button';edit.className='tree-edit';edit.textContent='✎';edit.title='Editar texto, cores, links e arquivos deste subtópico';
    edit.addEventListener('pointerdown',e=>e.stopPropagation());edit.onclick=e=>{e.stopPropagation();openBranchEditor(n.id,item.id)};actions.append(edit);
+   const color=document.createElement('button');
+   color.type='button';color.className='tree-color';
+   const currentColor=branchColor(item,'bgColor',isRoot?'#3659ad':'#ffffff');
+   color.style.backgroundColor=currentColor;color.textContent='';color.title='Mudar a cor deste quadro';
+   color.setAttribute('aria-label','Escolher a cor de '+(item.label||'subtópico'));
+   color.addEventListener('pointerdown',e=>e.stopPropagation());
+   color.onclick=e=>{
+    e.stopPropagation();
+    openBranchEditor(n.id,item.id);
+    const field=$('#branch-edit-bg');
+    field?.scrollIntoView({block:'center',behavior:'smooth'});
+    field?.focus({preventScroll:true});
+   };
+   actions.append(color);
    const add=document.createElement('button');add.type='button';add.textContent='+';add.title='Adicionar sub-ramo';
    add.addEventListener('pointerdown',e=>e.stopPropagation());add.onclick=e=>{e.stopPropagation();addBranch(item.id)};actions.append(add);
    if(!isRoot){
