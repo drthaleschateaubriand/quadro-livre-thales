@@ -57,3 +57,14 @@ test('notificação MCP não gera resposta de dados',async()=>{
   const res=await mcpHandler(new Request(base,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'})}),{},auth);
   assert.equal(res.status,202);
 });
+
+test('chamada de escrita sem mcp:write recebe 403 antes de acessar dados',async()=>{
+ const challenge=(session,scopes)=>{
+  assert.deepEqual(scopes,['mcp:read','mcp:write']);
+  assert.deepEqual(session.scope,['mcp:read']);
+  return new Response('insufficient_scope',{status:403,headers:{'www-authenticate':'Bearer error="insufficient_scope"'}});
+ };
+ const res=await mcpHandler(request('tools/call',{name:'criar_nota',arguments:{quadro_id:'root',texto:'Sem permissão'}}),{},auth,challenge);
+ assert.equal(res.status,403);
+ assert.match(res.headers.get('www-authenticate'),/insufficient_scope/);
+});
