@@ -21,8 +21,8 @@ test('tools/list publica oito ferramentas com esquemas JSON válidos',async()=>{
   const response=await mcpHandler(request('tools/list',{}),{},auth);
   const result=await response.json();
   assert.equal(response.status,200);
-  assert.equal(result.result.tools.length,8);
-  assert.equal(TOOLS.length,8);
+  assert.equal(result.result.tools.length,9);
+  assert.equal(TOOLS.length,9);
   const names=new Set(TOOLS.map(t=>t.name));
   assert.equal(names.size,8);
   assert.ok(names.has('buscar_anotacoes'));
@@ -67,4 +67,24 @@ test('chamada de escrita sem mcp:write recebe 403 antes de acessar dados',async(
  const res=await mcpHandler(request('tools/call',{name:'criar_nota',arguments:{quadro_id:'root',texto:'Sem permissão'}}),{},auth,challenge);
  assert.equal(res.status,403);
  assert.match(res.headers.get('www-authenticate'),/insufficient_scope/);
+});
+
+test('a prévia visual do quadro está ligada a um recurso MCP Apps válido',async()=>{
+ const preview=TOOLS.find(t=>t.name==='mostrar_quadro');
+ assert.ok(preview);
+ assert.equal(preview._meta.ui.resourceUri,'ui://quadro-livre/preview-v1.html');
+ const listed=await mcpHandler(request('resources/list',{}),{},auth);
+ const resources=(await listed.json()).result.resources;
+ assert.equal(resources.length,1);
+ assert.equal(resources[0].mimeType,'text/html;profile=mcp-app');
+ const response=await mcpHandler(request('resources/read',{uri:preview._meta.ui.resourceUri}),{},auth);
+ const content=(await response.json()).result.contents?.[0];
+ assert.equal(content.mimeType,'text/html;profile=mcp-app');
+ assert.match(content.text,/ui\/notifications\/tool-result/);
+ assert.match(content.text,/<div id="viewport"/);
+});
+test('o servidor bloqueia recursos MCP Apps desconhecidos',async()=>{
+ const response=await mcpHandler(request('resources/read',{uri:'ui://nao-autorizado/teste'}),{},auth);
+ const body=await response.json();
+ assert.equal(body.error.code,-32602);
 });
