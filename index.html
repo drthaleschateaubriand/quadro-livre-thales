@@ -532,6 +532,7 @@ const $ = (q, el=document) => el.querySelector(q);
 const $$ = (q, el=document) => [...el.querySelectorAll(q)];
 const viewport=$('#viewport'),world=$('#world'),nodesEl=$('#nodes'),lines=$('#lines'),grid=$('#grid');
 const input=$('#file-input'),title=$('#board-title'),status=$('#save-status'),inspector=$('#inspector');
+const MIN_ZOOM=.02,MAX_ZOOM=4;
 const SAVE_KEY='quadro-livre-board-v1', OPENED_KEY='quadro-livre-welcome';
 let contextTarget=null;
 let nodes=[], connectors=[], paths=[], arrows=[], selected=null, tool='select', interaction=null, zoom=1, ox=innerWidth*.42, oy=(innerHeight-70)*.43, history=[], future=[], db=null, saveTimer=null, toastTimer=null, spaceHeld=false, locked=false;
@@ -654,7 +655,7 @@ function openFolder(id){
  nodes=data.nodes||[];connectors=data.connectors||[];paths=data.paths||[];arrows=data.arrows||[];
  brush=normalizeBrush(data.brush);syncBrushToolbar();
  title.value=data.title||getFolderName(id);locked=Boolean(data.locked);
- zoom=Math.max(.2,Math.min(4,data.camera?.zoom||1));
+ zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,data.camera?.zoom||1));
  ox=Number.isFinite(data.camera?.ox)?data.camera.ox:innerWidth*.38;
  oy=Number.isFinite(data.camera?.oy)?data.camera.oy:innerHeight*.32;
  selected=null;history=[];future=[];interaction=null;
@@ -770,16 +771,16 @@ async function init(){
  nodes=data.nodes||[];connectors=data.connectors||[];paths=data.paths||[];arrows=data.arrows||[];
  brush=normalizeBrush(data.brush);syncBrushToolbar();
  title.value=data.title||'Meu primeiro quadro';locked=Boolean(data.locked);
- if(data.camera){zoom=Math.max(.2,Math.min(4,data.camera.zoom||1));ox=data.camera.ox??0;oy=data.camera.oy??0}
+ if(data.camera){zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,data.camera.zoom||1));ox=data.camera.ox??0;oy=data.camera.oy??0}
  render();updateCamera();setLocked(locked,true);renderFolders();scheduleSave();
  if(!localStorage.getItem(OPENED_KEY))$('#welcome-dialog').showModal();
 }
-function updateCamera(){world.style.transform=`translate(${ox}px,${oy}px) scale(${zoom})`;grid.style.backgroundSize=`${24*zoom}px ${24*zoom}px`;grid.style.backgroundPosition=`${ox}px ${oy}px`;$('#zoom-reset').textContent=`${Math.round(zoom*100)}%`;requestAnimationFrame(placeContextToolbar)}
+function updateCamera(){world.style.transform=`translate(${ox}px,${oy}px) scale(${zoom})`;grid.style.backgroundSize=`${24*zoom}px ${24*zoom}px`;grid.style.backgroundImage=zoom<.1?'none':'';grid.style.backgroundPosition=`${ox}px ${oy}px`;$('#zoom-reset').textContent=`${Math.round(zoom*100)}%`;requestAnimationFrame(placeContextToolbar)}
 const toWorld=(clientX,clientY)=>{let r=viewport.getBoundingClientRect();return{x:(clientX-r.left-ox)/zoom,y:(clientY-r.top-oy)/zoom}};
 function centerWorld(){const r=viewport.getBoundingClientRect();return toWorld(r.left+r.width/2,r.top+r.height/2)}
-function zoomAt(factor,clientX,clientY){const r=viewport.getBoundingClientRect();const x=clientX-r.left,y=clientY-r.top;const previous=zoom;zoom=Math.max(.2,Math.min(4,zoom*factor));const k=zoom/previous;ox=x-(x-ox)*k;oy=y-(y-oy)*k;updateCamera();scheduleSave()}
+function zoomAt(factor,clientX,clientY){const r=viewport.getBoundingClientRect();const x=clientX-r.left,y=clientY-r.top;const previous=zoom;zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,zoom*factor));const k=zoom/previous;ox=x-(x-ox)*k;oy=y-(y-oy)*k;updateCamera();scheduleSave()}
 function zoomCenter(factor){const r=viewport.getBoundingClientRect();zoomAt(factor,r.left+r.width/2,r.top+r.height/2)}
-function fitView(){if(!nodes.length&&!arrows.length){zoom=1;ox=viewport.clientWidth/2;oy=viewport.clientHeight/2;updateCamera();return}const xs=[...nodes.flatMap(n=>[n.x,n.x+n.w]),...arrows.flatMap(a=>[a.x1,a.x2])],ys=[...nodes.flatMap(n=>[n.y,n.y+n.h]),...arrows.flatMap(a=>[a.y1,a.y2])];let minX=Math.min(...xs)-100,minY=Math.min(...ys)-100,maxX=Math.max(...xs)+100,maxY=Math.max(...ys)+100;zoom=Math.max(.2,Math.min(1.5,Math.min(viewport.clientWidth/(maxX-minX),viewport.clientHeight/(maxY-minY))));ox=(viewport.clientWidth-(maxX+minX)*zoom)/2;oy=(viewport.clientHeight-(maxY+minY)*zoom)/2;updateCamera();scheduleSave()}
+function fitView(){if(!nodes.length&&!arrows.length){zoom=1;ox=viewport.clientWidth/2;oy=viewport.clientHeight/2;updateCamera();return}const xs=[...nodes.flatMap(n=>[n.x,n.x+n.w]),...arrows.flatMap(a=>[a.x1,a.x2])],ys=[...nodes.flatMap(n=>[n.y,n.y+n.h]),...arrows.flatMap(a=>[a.y1,a.y2])];let minX=Math.min(...xs)-100,minY=Math.min(...ys)-100,maxX=Math.max(...xs)+100,maxY=Math.max(...ys)+100;zoom=Math.max(MIN_ZOOM,Math.min(1.5,Math.min(viewport.clientWidth/(maxX-minX),viewport.clientHeight/(maxY-minY))));ox=(viewport.clientWidth-(maxX+minX)*zoom)/2;oy=(viewport.clientHeight-(maxY+minY)*zoom)/2;updateCamera();scheduleSave()}
 const toolbar=$('#context-toolbar');
 const ctxInput={bg:$('#context-bg'),fg:$('#context-fg'),font:$('#context-font'),width:$('#context-width'),height:$('#context-height')};
 const ctxPopover=$('#context-popover');let activeContextPane=null;
@@ -1930,7 +1931,7 @@ function updatePinch(){
  const rect=viewport.getBoundingClientRect(),cx=pts.x-rect.left,cy=pts.y-rect.top;
  const logRatio=Math.log(Math.max(12,pts.distance)/pinch.startDistance);
  const cleanLog=Math.sign(logRatio)*Math.max(0,Math.abs(logRatio)-0.025);
- const targetZoom=Math.max(.2,Math.min(4,pinch.startZoom*Math.exp(cleanLog*.70)));
+ const targetZoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,pinch.startZoom*Math.exp(cleanLog*.70)));
  zoom+=(targetZoom-zoom)*.40;
  const dx=cx-pinch.startX,dy=cy-pinch.startY;
  const deadzone=v=>Math.abs(v)<5?0:v-Math.sign(v)*5;
