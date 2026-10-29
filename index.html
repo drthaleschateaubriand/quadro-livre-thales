@@ -347,10 +347,38 @@
  .context-controls .ctx-icon,.context-controls .context-dismiss,.context-more summary{width:38px;height:38px;min-height:38px}
  .brush-toolbar{left:8px;top:76px;width:min(312px,calc(100vw - 16px))}
 }
+
+.cloud-dialog{border:1px solid #dce5f2;border-radius:18px;padding:20px;max-height:min(86vh,780px);overflow:auto;width:min(490px,calc(100vw - 22px));color:#28374f;box-shadow:0 19px 70px #101e3850}
+.cloud-dialog::backdrop{background:#17243c8c}
+.cloud-head{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid #e2e9f4;padding-bottom:12px;margin-bottom:12px;font-size:18px}
+.cloud-dialog [hidden],#cloud-gate[hidden]{display:none!important}
+.cloud-dialog p{font-size:12px;line-height:1.6;color:#52627b}
+.cloud-dialog hr{border:0;border-top:1px solid #e5ebf4;margin:17px 0}
+.cloud-dialog label{font-size:12px;display:flex;flex-direction:column;gap:5px;margin:9px 0;color:#52627b}
+.cloud-dialog input,.cloud-dialog select{width:100%;border:1px solid #d1ddeb;border-radius:9px;padding:10px;font-size:13px;color:#243954}
+.cloud-form{display:flex;flex-direction:column;gap:8px}
+.cloud-actions{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0}
+.cloud-actions button,.cloud-dialog button:not(.icon-button){padding:9px 12px;border:1px solid #d6e0f0;border-radius:9px;background:#f8faff;color:#34528c;cursor:pointer;font-size:12px}
+.cloud-dialog button.primary{background:#526dea;color:#fff}
+.cloud-disclaimer{font-size:11px!important;color:#8490a6!important}
+#cloud-error{background:#fff0f0;color:#9b2836;padding:10px;border-radius:9px}
+.cloud-member-list{display:flex;flex-direction:column;gap:6px;font-size:11px;margin:10px 0}
+.cloud-member-list .member{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#f2f5fb;padding:8px;border-radius:8px;overflow-wrap:anywhere}
+.cloud-user-email{font-weight:700}
+#cloud-gate{position:fixed;inset:0;z-index:99;display:grid;place-items:center;background:#f1f4f9f2;backdrop-filter:blur(20px);padding:20px;text-align:center}
+#cloud-gate>div{background:white;border:1px solid #d5dfef;border-radius:17px;padding:26px;max-width:420px;box-shadow:0 10px 40px #1b33582b}
+#cloud-gate p{color:#63718d;line-height:1.5}
+@media(max-width:680px){#cloud-toggle{padding:6px;min-width:34px}#cloud-toggle .cloud-btn-label{display:none}}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script defer src="./firebase-config.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/11.10.0/firebase-auth-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/11.10.0/firebase-storage-compat.js"></script>
+<script defer src="./cloud-sync.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -364,6 +392,7 @@
       <button class="secondary compact" data-action="redo" title="Refazer (Ctrl+Y)" aria-label="Refazer">↷</button>
       <button class="secondary" id="import-file"><span>＋</span> Importar</button>
       <button class="primary" id="export-file">Salvar arquivo</button>
+      <button type="button" id="cloud-toggle" class="secondary" title="Login, sincronização e acessos à nuvem"><span aria-hidden="true">☁</span> <span class="cloud-btn-label">Nuvem</span></button>
       <button type="button" class="lock-toggle" id="board-lock" aria-label="Travar elementos do quadro" aria-pressed="false" title="Travar os elementos, mantendo zoom e movimentação">
         <svg class="lock-icon lock-open" xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-1.8"/></svg>
         <svg class="lock-icon lock-closed" xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 1 1 8 0v4"/></svg>
@@ -495,6 +524,48 @@
   </aside>
   <div class="bottom-left"><span id="tool-label">Seleção</span><span class="separator">•</span><span id="count-label">0 elementos</span></div>
   <div id="toast" role="status" aria-live="polite"></div>
+<dialog id="cloud-dialog" class="cloud-dialog" aria-labelledby="cloud-heading">
+  <div class="cloud-head"><strong id="cloud-heading">Nuvem e acesso</strong><button type="button" id="cloud-close" class="icon-button" aria-label="Fechar">×</button></div>
+  <div id="cloud-unconfigured">
+   <p>O Firebase ainda não está conectado a este Quadro Livre. O aplicativo continua salvando os arquivos neste dispositivo.</p>
+   <p>Para ativar login e sincronização, precisamos vincular um projeto Firebase e publicar suas regras de segurança.</p>
+   <p class="cloud-disclaimer">Não coloque senhas pessoais nem chaves administrativas no código.</p>
+  </div>
+  <div id="cloud-signed-out" hidden>
+   <p>Entre para acessar seus quadros em outros dispositivos.</p>
+   <form id="cloud-login-form" class="cloud-form">
+    <label>E-mail<input type="email" id="cloud-email" required autocomplete="email"></label>
+    <label>Senha<input type="password" id="cloud-password" required autocomplete="current-password" minlength="8"></label>
+    <button type="submit" class="primary">Entrar</button>
+   </form>
+   <div class="cloud-actions"><button type="button" id="cloud-register">Criar conta</button><button type="button" id="cloud-reset-password">Recuperar senha</button></div>
+  </div>
+  <div id="cloud-verification" hidden>
+    <p>Verifique seu endereço de e-mail antes de entrar na nuvem e compartilhar quadros.</p>
+    <div class="cloud-actions"><button id="cloud-send-verification">Enviar verificação</button><button id="cloud-check-verification">Já verifiquei</button><button id="cloud-signout-unverified">Sair</button></div>
+  </div>
+  <div id="cloud-signed-in" hidden>
+   <p id="cloud-user-email" class="cloud-user-email"></p><p id="cloud-status" aria-live="polite">Nuvem desconectada</p>
+   <div class="cloud-actions"><button type="button" id="cloud-load-mine" class="primary">Abrir meu quadro da nuvem</button><button type="button" id="cloud-upload-local">Enviar quadros locais</button></div>
+   <div class="cloud-actions"><button type="button" id="cloud-save-now">Sincronizar agora</button><button type="button" id="cloud-download-backup">Baixar backup ZIP</button><button type="button" id="cloud-sync-attachments">Enviar arquivos anexados</button></div>
+   <hr><strong>Gerenciar acessos</strong>
+   <p>Compartilhe a pasta de trabalho somente com pessoas autorizadas. Os convites exigem e-mail verificado.</p>
+   <label for="cloud-share-workspace">ID do quadro compartilhado</label>
+   <input type="text" id="cloud-share-workspace" placeholder="ID recebido do proprietário">
+   <button type="button" id="cloud-open-shared">Abrir quadro compartilhado</button>
+   <div id="cloud-owner-controls">
+     <label for="cloud-invite-email">Convidar e-mail</label><input id="cloud-invite-email" type="email" placeholder="pessoa@exemplo.com">
+     <label for="cloud-invite-role">Permissão</label><select id="cloud-invite-role"><option value="viewer">Visualizar</option><option value="editor">Editar</option></select>
+     <button id="cloud-invite-add">Conceder acesso</button>
+     <div id="cloud-member-list" class="cloud-member-list"></div>
+     <button id="cloud-share-link">Copiar link do quadro</button>
+   </div>
+   <p class="cloud-disclaimer">Arquivos grandes exigem Cloud Storage, que requer o plano Blaze. Sem isso, anexos continuam no navegador e no backup local.</p>
+   <button type="button" id="cloud-signout">Sair da conta</button>
+  </div>
+  <p id="cloud-error" role="alert" hidden></p>
+</dialog>
+<div id="cloud-gate" hidden><div><strong>Quadro Livre protegido</strong><p>Entre com sua conta para visualizar os quadros sincronizados.</p><button id="cloud-gate-login" class="primary" type="button">Fazer login</button></div></div>
   <input id="file-input" type="file" multiple hidden>
   <dialog id="slides-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Apresentação</strong><button type="button" class="icon-button" id="slides-close" aria-label="Fechar apresentação">×</button></div><div class="slide-display"><div id="slide-counter"></div><h2 id="slide-heading"></h2><p id="slide-description"></p></div><div class="slide-controls"><button class="secondary" id="slide-previous">Anterior</button><button class="primary" id="slide-next">Próximo</button></div></div></dialog>
   
@@ -569,10 +640,15 @@ function storeAttachment(id,file){return new Promise((resolve,reject)=>{if(!db||
  const tx=db.transaction('attachments','readwrite');tx.objectStore('attachments').put(file,id);
  tx.oncomplete=()=>resolve(id);tx.onerror=()=>reject(tx.error)
 })}
-function getAttachment(id){return new Promise((resolve,reject)=>{if(!db||!db.objectStoreNames.contains('attachments'))return resolve(null);
+function getLocalAttachment(id){return new Promise((resolve,reject)=>{if(!db||!db.objectStoreNames.contains('attachments'))return resolve(null);
  const tx=db.transaction('attachments','readonly');const req=tx.objectStore('attachments').get(id);
  req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)
 })}
+async function getAttachment(id){
+ const local=await getLocalAttachment(id);if(local)return local;
+ if(window.QuadoCloudRemoteFile)return window.QuadoCloudRemoteFile(id);
+ return null
+}
 async function downloadAttachment(n){
  if(n.attachmentId){
   const blob=await getAttachment(n.attachmentId);
@@ -592,7 +668,7 @@ async function displayAttachedImage(n,img){
 function emptyBoard(name='Nova pasta'){return{title:name,nodes:[],connectors:[],paths:[],arrows:[],brush:{...DEFAULT_BRUSH},locked:false,camera:{zoom:1,ox:innerWidth*.38,oy:innerHeight*.32}}}
 function captureBoard(){return JSON.parse(JSON.stringify({title:title.value||'Meu quadro',nodes,connectors,paths,arrows,brush,locked,camera:{zoom,ox,oy}}))}
 function snapshotWorkspace(){if(!workspace)workspace={version:2,folders:[],canvases:{root:emptyBoard('Meu primeiro quadro')},activeFolderId:'root'};workspace.canvases[activeFolderId]=captureBoard();workspace.activeFolderId=activeFolderId;return JSON.stringify(workspace)}
-async function save(){const serialized=snapshotWorkspace();try{await idbSet(serialized,WORKSPACE_KEY);status.textContent='Salvo neste dispositivo'}catch(e){status.textContent='Não foi possível salvar';toast('Espaço local insuficiente. Exporte um backup do projeto.')}}
+async function save(){const serialized=snapshotWorkspace();try{await idbSet(serialized,WORKSPACE_KEY);status.textContent='Salvo neste dispositivo';window.dispatchEvent(new Event('quadro:local-saved'))}catch(e){status.textContent='Não foi possível salvar';toast('Espaço local insuficiente. Exporte um backup do projeto.')}}
 function openFolder(id){
  hideContextToolbar();
  if(!workspace||(id!=='root'&&!workspace.folders.some(x=>x.id===id)))return;
@@ -1862,6 +1938,26 @@ viewport.addEventListener('pointerup',finishTouch,{capture:true});
 viewport.addEventListener('pointercancel',finishTouch,{capture:true});
 // Exportação de PNG via botão adicional, mantida independente do salvamento do projeto.
 const pngButton=document.createElement('button');pngButton.id='export-png';pngButton.className='secondary';pngButton.textContent='PNG';pngButton.title='Exportar imagem';pngButton.onclick=exportPng;$('#export-file').before(pngButton);
+window.QuadroCloudHost={
+ getWorkspace:()=>JSON.parse(snapshotWorkspace()),
+ async replaceWorkspace(data){
+  if(!data||data.version!==2||!data.canvases||!Array.isArray(data.folders)||!data.canvases.root)throw Error('Backup inválido');
+  workspace=data;activeFolderId=data.canvases[data.activeFolderId]?data.activeFolderId:'root';
+  const board=workspace.canvases[activeFolderId];
+  nodes=board.nodes||[];connectors=board.connectors||[];paths=board.paths||[];arrows=board.arrows||[];
+  brush=normalizeBrush(board.brush);syncBrushToolbar();
+  title.value=board.title||'Meu quadro';locked=Boolean(board.locked);
+  zoom=Math.max(.2,Math.min(4,board.camera?.zoom||1));ox=board.camera?.ox??0;oy=board.camera?.oy??0;
+  selected=null;history=[];future=[];interaction=null;
+  render();updateCamera();setLocked(locked,true);renderFolders();updateUndoButtons();await save();
+ },
+ getAttachment,
+ getLocalAttachment,
+ storeAttachment,
+ exportBackup:exportProject,
+ toast,
+ setRemoteReadOnly(readOnly){if(readOnly){setLocked(true,true);toast('Você pode visualizar este quadro, mas não editar.')}else{const current=workspace?.canvases?.[activeFolderId];setLocked(Boolean(current?.locked),true)}}
+};
 init();
 })();
 </script>
