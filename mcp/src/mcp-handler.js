@@ -2,6 +2,7 @@ import {
   refreshFirebaseToken, getWorkspaceMeta, readBoard, listBoards,
   saveBoard, makeNote, summarizeBoard, searchBoard
 } from './firestore.js';
+import { BOARD_RESOURCE_URI, BOARD_WIDGET_HTML } from './board-widget.js';
 
 const PROTOCOL='2025-06-18';
 const READ_SECURITY=[{type:'oauth2',scopes:['mcp:read']}];
@@ -28,6 +29,8 @@ const TOOLS=[
  tool('listar_quadros','Lista os quadros salvos no Firestore, com títulos e quantidades.',{}),
  tool('ler_quadro','Lê notas e organização de um quadro existente, sem baixar anexos binários.',
    {quadro_id:BOARD_ID},['quadro_id']),
+ tool('mostrar_quadro','Mostra uma prévia visual interativa de navegação com zoom de um quadro sincronizado, sem alterar os dados.',
+   {quadro_id:BOARD_ID},['quadro_id'],false,{'_meta':{ui:{resourceUri:BOARD_RESOURCE_URI}}}),
  tool('buscar_anotacoes','Busca conteúdo textual nos quadros sincronizados.',
    {termo:{...STRING,minLength:1,maxLength:160}},['termo']),
  tool('listar_documentos','Lista documentos anexados aos quadros (nome/tipo), sem revelar conteúdo dos PDFs.',
@@ -70,6 +73,15 @@ async function performTool(name,args,env,props) {
       id:n.id,tipo:n.type,texto:String(n.text||n.titleText||n.name||'').slice(0,1500),
       x:n.x,y:n.y,subtopicos:(n.tree||[]).slice(0,40).map(t=>({titulo:String(t.label||'').slice(0,180),detalhe:String(t.detail||'').slice(0,500)}))
     })),totalElementos:b.data.nodes.length};
+  }
+  if(name==='mostrar_quadro'){
+    paramsOK(args,['quadro_id'],['quadro_id']);
+    const b=await readBoard(env,uid,idToken,args.quadro_id);
+    return {quadro:{id:b.id,title:String(b.data.title||b.id).slice(0,120),
+      nodes:b.data.nodes.slice(0,120).map(n=>({
+        id:n.id,tipo:n.type,x:n.x,y:n.y,w:n.w,h:n.h,color:n.color,
+        texto:String(n.text||n.titleText||n.name||'').slice(0,750)
+      }))},totalElementos:b.data.nodes.length,modo:'visualizacao'};
   }
   if(name==='buscar_anotacoes'){
     paramsOK(args,['termo'],['termo']);
@@ -131,11 +143,23 @@ async function mcpHandler(request,env,context,makeInsufficientScope) {
   if(!msg||Array.isArray(msg)||msg.jsonrpc!=='2.0')return json({jsonrpc:'2.0',id:null,error:{code:-32600,message:'Requisição MCP inválida.'}});
   if(msg.method==='notifications/initialized'||msg.method==='notifications/cancelled')return new Response(null,{status:202,headers:noCache});
   const response=(value)=>json({jsonrpc:'2.0',id:msg.id??null,result:value});
-  if(msg.method==='initialize')return response({protocolVersion:PROTOCOL,capabilities:{tools:{listChanged:false}},
+  if(msg.method==='initialize')return response({protocolVersion:PROTOCOL,capabilities:{tools:{listChanged:false},resources:{listChanged:false}},
     serverInfo:{name:'quadro-livre',version:'0.1.0'},
     instructions:'Acessa exclusivamente quadros já sincronizados no Firebase; notas e documentos somente com permissão.'});
   if(msg.method==='ping')return response({});
   if(msg.method==='tools/list')return response({tools:TOOLS});
+  if(msg.method==='resources/list')return response({resources:[{
+    uri:BOARD_RESOURCE_URI,name:'Prévia do Quadro Livre',
+    description:'Visualização de cartões e notas, com zoom e navegação; sem edição de documentos.',
+    mimeType:'text/html;profile=mcp-app'
+  }]});
+  if(msg.method==='resources/read'){
+    if(msg.params?.uri!==BOARD_RESOURCE_URI)return json({jsonrpc:'2.0',id:msg.id??null,error:{code:-32602,message:'Recurso não encontrado.'}});
+    return response({contents:[{
+      uri:BOARD_RESOURCE_URI,mimeType:'text/html;profile=mcp-app',
+      text:BOARD_WIDGET_HTML,_meta:{ui:{prefersBorder:true}}
+    }]});
+  }
   if(msg.method==='tools/call'){
     const name=msg.params?.name,args=msg.params?.arguments||{};
     if(!TOOLS.some(x=>x.name===name))return json({jsonrpc:'2.0',id:msg.id??null,error:{code:-32601,message:'Ferramenta desconhecida.'}});
