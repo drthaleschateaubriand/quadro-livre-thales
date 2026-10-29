@@ -215,6 +215,12 @@
 .slide-display.title{text-align:center}.slide-display.blank{background:#fff}
 .slide-display .present-photo{max-height:245px;max-width:100%;object-fit:contain;border-radius:10px;margin:12px auto}
 @media(max-width:760px){.slide-canvas{height:260px;padding:17px}.slide-edit-title{font-size:23px}.slide-edit-detail{font-size:14px}.slide-preset-gallery{max-height:240px}}
+
+.slide-display.two-columns{display:grid;grid-template-columns:1fr 1fr;align-items:center;column-gap:22px}
+.slide-display.two-columns #slide-counter{grid-column:1/-1}
+.slide-display.two-columns #slide-heading,.slide-display.two-columns #slide-description{grid-column:1}
+.slide-display.two-columns .present-extra,.slide-display.two-columns .present-photo{grid-column:2;grid-row:2/span 2}
+.slide-display .present-extra{font-size:19px;padding:20px;border-radius:10px;background:#e3ecf9;white-space:pre-wrap}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -305,7 +311,7 @@
   <dialog id="slides-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Apresentação</strong><button type="button" class="icon-button" id="slides-close" aria-label="Fechar apresentação">×</button></div><div class="slide-display"><div id="slide-counter"></div><h2 id="slide-heading"></h2><p id="slide-description"></p></div><div class="slide-controls"><button class="secondary" id="slide-previous">Anterior</button><button class="primary" id="slide-next">Próximo</button></div></div></dialog>
   <dialog id="poll-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Atividade</strong><button type="button" class="icon-button" id="poll-close" aria-label="Fechar atividade">×</button></div><h2 id="poll-question"></h2><div id="poll-options"></div><p class="small-muted">Votação local neste navegador. Não há participação simultânea pela internet.</p></div></dialog>
   <dialog id="welcome-dialog"><div class="dialog-body"><div class="dialog-mark">Q</div><h2>Seu quadro está pronto</h2><p>Crie notas, mova elementos, importe documentos e organize tudo em um espaço infinito.</p><p class="privacy-note"><strong>Privacidade:</strong> nesta versão, o salvamento é feito no navegador deste dispositivo. Para usar o mesmo quadro em outro aparelho, exporte e importe o arquivo do projeto. A sincronização em nuvem ainda não está ativada.</p><button class="primary" id="welcome-close">Começar a criar</button></div></dialog>
-<script>/* Quadro Livre v1.5.0 - editor de quadro infinito, sem servidor e sem rastreamento */
+<script>/* Quadro Livre v1.6.0 - editor de quadro infinito, sem servidor e sem rastreamento */
 (() => {
 'use strict';
 const $ = (q, el=document) => el.querySelector(q);
@@ -551,7 +557,9 @@ function renderSlideViewer(){const n=nodes.find(x=>x.id===currentPresentation?.i
  $('#slide-description').textContent=slides[idx]?.detail||'';
  const stage=$('.slide-display',$('#slides-dialog'));stage.className='slide-display '+(slides[idx]?.layout||'title');
  stage.querySelectorAll('.present-photo').forEach(el=>el.remove());
+ stage.querySelectorAll('.present-photo,.present-extra').forEach(el=>el.remove());
  if(slides[idx]?.image){const img=document.createElement('img');img.className='present-photo';img.src=slides[idx].image;img.alt='Imagem do slide';stage.append(img)}
+ else if(slides[idx]?.layout==='two-columns'){const extra=document.createElement('p');extra.className='present-extra';extra.textContent=slides[idx].rightText||'Segunda coluna';stage.append(extra)}
  $('#slide-previous').disabled=idx===0;$('#slide-next').disabled=idx>=slides.length-1
 }
 $('#slides-close').onclick=()=>$('#slides-dialog').close();
@@ -899,7 +907,7 @@ function renderSlideTemplate(el,n){
   const grid=document.createElement('div');grid.className='slide-layout-split';grid.append(left);
   const right=document.createElement('div');
   if(slide.image){const img=document.createElement('img');img.src=slide.image;img.className='slide-picture';img.alt='Imagem do slide';right.append(img)}
-  else {const placeholder=document.createElement('div');placeholder.className='slide-picture-placeholder';placeholder.textContent=layout==='title-image'?'Insira uma imagem':'Segunda coluna';right.append(placeholder)}
+  else if(layout==='title-image'){const placeholder=document.createElement('div');placeholder.className='slide-picture-placeholder';placeholder.textContent='Insira uma imagem';right.append(placeholder)}
   if(layout==='two-columns'&&!slide.image){const extra=document.createElement('div');extra.className='slide-edit-detail';extra.textContent=slide.rightText||'Edite a segunda coluna';makeEditableField(extra,slide,'rightText',n.id);right.append(extra)}
   if(!locked){const upload=document.createElement('button');upload.type='button';upload.className='slide-image-button';upload.textContent=slide.image?'Trocar imagem':'＋ Adicionar imagem';
    const picker=document.createElement('input');picker.type='file';picker.accept='image/*';picker.hidden=true;
@@ -1248,9 +1256,13 @@ async function exportPng(){if(!nodes.length&&!paths.length&&!arrows.length)retur
  for(const path of paths){ctx.strokeStyle=path.color||'#344f81';ctx.lineWidth=path.width||3;ctx.lineCap='round';ctx.beginPath();path.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke()}for(const n of nodes){ctx.fillStyle=n.color||'#fff';ctx.strokeStyle='#d5dbe7';ctx.lineWidth=1;ctx.beginPath();if(n.type==='ellipse')ctx.ellipse(n.x+n.w/2,n.y+n.h/2,n.w/2,n.h/2,0,0,Math.PI*2);else ctx.roundRect(n.x,n.y,n.w,n.h,8);ctx.fill();ctx.stroke();if(n.type==='file'&&n.preview==='image'&&n.src){try{const img=new Image();img.src=n.src;await img.decode();ctx.drawImage(img,n.x+3,n.y+30,n.w-6,n.h-33)}catch(e){}}else if(n.type==='template'){
  ctx.fillStyle='#263950';ctx.font='bold 23px sans-serif';ctx.fillText((n.titleText||'Bloco').slice(0,48),n.x+16,n.y+62);
  ctx.font='14px sans-serif';let yy=n.y+92;
- for(const item of n.items||[]){if(yy>n.y+n.h-30)break;
- ctx.fillText(String(item.label||'').slice(0,48),n.x+18,yy);yy+=21;
- ctx.fillText(String(item.detail||'').replace(/\n/g,' ').slice(0,75),n.x+20,yy);yy+=29}
+ let items=n.items||[];
+ if(['mindmap','orgchart'].includes(n.kind)){items=(n.tree||[]).map(item=>({label:(item.parentId?'↳ ':'')+item.label,detail:item.detail}))}
+ if(n.kind==='timeline'){items=(n.timelineTasks||[]).map(task=>({label:task.name,detail:task.start+' → '+task.end}))}
+ if(n.kind==='agenda'){items=(n.events||[]).sort((a,b)=>a.date.localeCompare(b.date)).map(ev=>({label:ev.date+' '+(ev.time||''),detail:ev.name}))}
+ for(const item of items){if(yy>n.y+n.h-30)break;
+ ctx.fillStyle='#243854';ctx.font='bold 13px sans-serif';ctx.fillText(String(item.label||'').slice(0,68),n.x+18,yy);yy+=20;
+ ctx.fillStyle='#64718a';ctx.font='13px sans-serif';ctx.fillText(String(item.detail||'').replace(/\n/g,' ').slice(0,95),n.x+20,yy);yy+=25}
  }else if(['note','text'].includes(n.type)){ctx.fillStyle='#233047';ctx.font=n.type==='text'?'600 21px sans-serif':'16px sans-serif';const maxW=n.w-27;let yy=n.y+47;for(let paragraph of String(n.text||'').split('\n')){let words=paragraph.split(' '),line='';for(let word of words){let next=line?line+' '+word:word;if(ctx.measureText(next).width>maxW&&line){ctx.fillText(line,n.x+14,yy);yy+=24;line=word}else line=next;if(yy>n.y+n.h-15)break}if(yy>n.y+n.h-15)break;ctx.fillText(line,n.x+14,yy);yy+=24}}else if(n.type==='file'){ctx.fillStyle='#56637c';ctx.font='14px sans-serif';ctx.fillText((n.name||'Arquivo').slice(0,35),n.x+15,n.y+56)}}const url=c.toDataURL('image/png');downloadData(url,'quadro-livre.png');toast('Imagem PNG exportada.')}
 $('#welcome-close').onclick=()=>{$('#welcome-dialog').close();localStorage.setItem(OPENED_KEY,'1')};$('#welcome-dialog').addEventListener('close',()=>localStorage.setItem(OPENED_KEY,'1'));
 $$('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));$('#insert-files').onclick=$('#import-file').onclick=()=>{setToolsOpen(false);input.click()};$('#start-note').onclick=()=>{let p=centerWorld();addNode('note',p.x-110,p.y-80)};input.addEventListener('change',async e=>{await importFiles(input.files);input.value=''});
