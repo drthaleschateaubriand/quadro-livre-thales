@@ -79,6 +79,27 @@
 .node .link-pill{position:absolute;right:8px;top:31px;z-index:3;font-size:12px;border:1px solid #c5d6fa;border-radius:8px;background:#eaf0ff;color:#3758a1;padding:4px 8px;cursor:pointer}
 #lines .arrow-bend-handle{fill:#805bea;stroke:white;stroke-width:3;cursor:crosshair;pointer-events:all}
 @media(max-width:760px){.creation-menu{top:68px;left:8px}.creation-trigger{min-width:35px;padding:0 7px}}
+
+/* Blocos de criação editáveis e links */
+.node.template{min-width:260px;min-height:150px}
+.template-body{height:calc(100% - 29px);overflow:auto;padding:14px 16px 20px;touch-action:auto}
+.template-title{font-size:23px;font-weight:800;line-height:1.25;color:#253450;outline:none;margin-bottom:14px;white-space:pre-wrap}
+.template-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.template-grid.kanban-grid,.template-grid.prototype-grid{grid-template-columns:repeat(3,minmax(130px,1fr));min-width:430px}
+.template-grid.table-grid{grid-template-columns:repeat(3,minmax(130px,1fr))}
+.template-grid.timeline-grid{grid-template-columns:1fr}
+.template-item{background:#f8faff;border:1px solid #e2e9f4;border-radius:11px;min-height:95px;overflow:visible;padding:11px;position:relative}
+.template-item .item-label{font-size:12px;font-weight:800;color:#466084;outline:none;border-bottom:1px solid #e6edf5;padding-bottom:7px;margin-bottom:8px}
+.template-item .item-detail{font-size:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;color:#28384e;min-height:35px;outline:none}
+.template-item .item-label:focus,.template-item .item-detail:focus,.template-title:focus{outline:2px solid #90a7ee;outline-offset:2px;border-radius:4px}
+.template-footer{display:flex;justify-content:space-between;gap:12px;margin-top:13px;align-items:center}
+.template-footer button{font-size:12px;border:1px solid #dce5f4;border-radius:8px;background:#fff;padding:8px 11px;color:#3659a1;cursor:pointer}
+.template-footer small{font-size:10px;color:#8b97ab;line-height:1.4}
+.template-item .item-remove{position:absolute;right:5px;top:4px;border:0;background:transparent;font-size:15px;color:#9aa5b6;cursor:pointer;padding:2px 5px}
+.template-item .item-remove:hover{color:#c63c4b}
+.node.template .drag-handle{background:#e9efff}
+.template-body[aria-readonly="true"] [contenteditable]{cursor:default}
+@media(max-width:760px){.template-grid.kanban-grid,.template-grid.prototype-grid{grid-template-columns:repeat(3,minmax(135px,1fr))}}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -197,7 +218,7 @@ function setLocked(value,quiet=false){
  $('#import-file').disabled=locked;
  $('#insert-files').disabled=locked;
  $('#start-note').disabled=locked;
- toolsMenu.disabled=locked;
+ toolsMenu.disabled=locked;$('#create-menu-toggle').disabled=locked;if(locked)closeCreateMenu();
  $$('.node').forEach(el=>{el.tabIndex=locked?-1:0;const editor=$('.node-text',el);if(editor){editor.contentEditable=String(!locked);editor.tabIndex=locked?-1:0;}});
  if(locked){if(document.activeElement?.blur)document.activeElement.blur();selectNode(null);setToolsOpen(false);setTool('hand');}
  else {setTool('select');}
@@ -373,14 +394,87 @@ function selectNode(id){
 
 function addNode(type,x,y,more={}){if(locked)return null;checkpoint();let n=makeNode(type,x,y,more);nodes.push(n);render();selectNode(n.id);scheduleSave();return n}
 function textEscape(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+const templateDefs={
+ prototype:{title:'Protótipo de aplicativo',items:[['Tela inicial','Cabeçalho • imagem • botão principal'],['Tela de detalhes','Conteúdo, informações e ações'],['Navegação','Voltar • Próximo • Menu']]},
+ table:{title:'Tabela de dados',items:[['Coluna A','Valor 1'],['Coluna B','Valor 2'],['Coluna C','Valor 3'],['Nova linha','Preencha uma nova informação']]},
+ timeline:{title:'Timeline do projeto',items:[['Etapa 1 · Início','Objetivo e data'],['Etapa 2 · Desenvolvimento','Atividades e responsáveis'],['Etapa 3 · Conclusão','Entrega final']]},
+ kanban:{title:'Kanban de tarefas',items:[['A fazer','• Planejar\n• Definir prioridades'],['Em andamento','• Executar uma tarefa'],['Concluído','• Revisar resultado']]},
+ document:{title:'Documento',items:[['Introdução','Escreva o texto do documento.'],['Desenvolvimento','Adicione parágrafos, listas e referências.'],['Conclusão','Resumo e próximos passos.']]},
+ slides:{title:'Apresentação em slides',items:[['Slide 1 · Abertura','Título principal\nSubtítulo'],['Slide 2 · Conteúdo','Ponto principal\nExemplo'],['Slide 3 · Conclusão','Resumo e próximos passos']]},
+ engage:{title:'Atividade interativa',items:[['Pergunta','Qual pergunta deseja apresentar?'],['Opção A','Primeira resposta'],['Opção B','Segunda resposta'],['Opção C','Terceira resposta']]},
+ talktrack:{title:'Roteiro Talktrack',items:[['Abertura','Apresentação e contexto'],['Roteiro','O que você pretende explicar ou demonstrar?'],['Anexos','Anexe áudio ou vídeo ao quadro usando Importar.']]},
+ diagram:{title:'Diagrama',items:[['Início','Ponto de partida'],['Processo','Etapa seguinte'],['Resultado','Objetivo final']]},
+ flows:{title:'Fluxo de trabalho',items:[['Entrada','Início do fluxo'],['Decisão','Sim ou não?'],['Ação','Próximo passo']]}
+};
+function safeWebUrl(raw){
+ let url=String(raw||'').trim();if(!url)return '';
+ if(!/^https?:\/\//i.test(url)&&!url.includes(':'))url='https://'+url;
+ try{const u=new URL(url);if(!['https:','http:'].includes(u.protocol)||u.username||u.password)return '';return u.href}catch{return ''}
+}
+function openSafeLink(url){const target=safeWebUrl(url);if(!target){toast('Endereço inválido. Use https:// ou http://');return}window.open(target,'_blank','noopener,noreferrer')}
+function addWebLink(){
+ if(locked)return toast('Destrave o quadro para criar um link.');
+ const raw=prompt('Cole o endereço do link (https://):','https://');if(raw===null)return;
+ const href=safeWebUrl(raw);if(!href)return toast('Endereço inválido. Use um link http ou https.');
+ const name=prompt('Nome do link:','Link salvo');if(name===null)return;
+ const p=centerWorld();addNode('note',p.x-150,p.y-90,{text:(name.trim()||'Link salvo'),href,w:310,h:135,color:'#e7f0ff'});
+ closeCreateMenu();toast('Hiperlink guardado no quadro.');
+}
+function closeCreateMenu(){$('#creation-menu').hidden=true;$('#create-menu-toggle').setAttribute('aria-expanded','false')}
+function toggleCreateMenu(){const pane=$('#creation-menu');if(locked){toast('Destrave o quadro para inserir.');return}if(!pane.hidden){closeCreateMenu();return}closeFolders();setToolsOpen(false);pane.hidden=false;$('#create-menu-toggle').setAttribute('aria-expanded','true')}
+$('#create-menu-toggle').addEventListener('click',toggleCreateMenu);
+$('#creation-close').addEventListener('click',closeCreateMenu);
+$$('[data-template]').forEach(button=>button.addEventListener('click',()=>{
+ const kind=button.dataset.template;if(kind==='url'){addWebLink();return}
+ if(locked)return toast('Destrave o quadro.');
+ const def=templateDefs[kind];if(!def)return;
+ const p=centerWorld();
+ if(kind==='diagram'||kind==='flows'){
+  checkpoint();
+  const first=makeNode('note',p.x-420,p.y-80,{w:200,h:120,text:kind==='flows'?'INÍCIO':'CONCEITO',color:'#e1edff'});
+  const second=makeNode('note',p.x-145,p.y-80,{w:200,h:120,text:kind==='flows'?'DECISÃO':'PROCESSO',color:'#fff0c4'});
+  const third=makeNode('note',p.x+130,p.y-80,{w:200,h:120,text:kind==='flows'?'RESULTADO':'CONCLUSÃO',color:'#dbf6e8'});
+  nodes.push(first,second,third);
+  for(const [a,b] of [[first,second],[second,third]])arrows.push({id:uid(),x1:a.x+a.w,y1:a.y+a.h/2,x2:b.x,y2:b.y+b.h/2,width:3,color:'#5874bc',curve:kind==='flows'?55:0});
+  render();scheduleSave();
+ }else{
+  addNode('template',p.x-350,p.y-210,{kind,titleText:def.title,items:def.items.map(x=>({id:uid(),label:x[0],detail:x[1]})),w:kind==='kanban'?800:kind==='timeline'?670:kind==='prototype'?660:720,h:420,color:'#ffffff'});
+ }
+ closeCreateMenu();toast(def.title+' adicionado.');
+}));
+function renderTemplate(el,n){
+ const body=document.createElement('div');body.className='template-body';body.setAttribute('aria-readonly',String(locked));
+ const heading=document.createElement('div');heading.className='template-title';heading.contentEditable=String(!locked);heading.textContent=n.titleText||'Bloco editável';body.append(heading);
+ const setValue=(target,key,owner)=>{let before='';target.addEventListener('focus',()=>{before=snapshot();selectNode(n.id)});
+ target.addEventListener('input',()=>{owner[key]=target.innerText; scheduleSave()});
+ target.addEventListener('blur',()=>{if(before!==snapshot()){history.push(before);if(history.length>45)history.shift();future=[];updateUndoButtons()}})};
+ setValue(heading,'titleText',n);
+ const grid=document.createElement('div');grid.className='template-grid '+(n.kind==='kanban'?'kanban-grid':n.kind==='prototype'?'prototype-grid':n.kind==='table'?'table-grid':n.kind==='timeline'?'timeline-grid':'');
+ for(const item of n.items||[]){
+  const cell=document.createElement('div');cell.className='template-item';
+  const l=document.createElement('div');l.className='item-label';l.contentEditable=String(!locked);l.textContent=item.label;
+  const d=document.createElement('div');d.className='item-detail';d.contentEditable=String(!locked);d.textContent=item.detail;
+  setValue(l,'label',item);setValue(d,'detail',item);
+  if(!locked){const rm=document.createElement('button');rm.className='item-remove';rm.textContent='×';rm.title='Remover seção';rm.addEventListener('pointerdown',e=>e.stopPropagation());rm.onclick=()=>{checkpoint();n.items=n.items.filter(x=>x.id!==item.id);render();selectNode(n.id);scheduleSave()};cell.append(rm)}
+  cell.append(l,d);grid.append(cell)
+ }
+ body.append(grid);
+ const foot=document.createElement('div');foot.className='template-footer';
+ const hint=document.createElement('small');hint.textContent='Bloco inicial editável. Não substitui todos os recursos do Miro.';
+ foot.append(hint);
+ if(!locked){const add=document.createElement('button');add.textContent='+ Nova seção';add.addEventListener('pointerdown',e=>e.stopPropagation());add.onclick=()=>{checkpoint();n.items.push({id:uid(),label:'Nova seção',detail:'Edite aqui'});render();selectNode(n.id);scheduleSave()};foot.append(add)}
+ body.append(foot);el.append(body)
+}
 function fileIcon(type){return type?.includes('pdf')?'PDF':type?.includes('presentation')||type?.includes('powerpoint')?'PPT':type?.includes('sheet')||type?.includes('excel')?'XLS':'ARQ'}
-function render(){const fragment=document.createDocumentFragment();nodes.forEach(n=>{let el=document.createElement('div');el.className=`node ${n.type==='note'?'':n.type==='text'?'text':n.type==='rect'?'rect':n.type==='ellipse'?'ellipse':'media'}`;el.dataset.id=n.id;el.tabIndex=locked?-1:0;el.style.cssText=`left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;background:${n.color}`;if(n.id===selected)el.classList.add('selected');let handle=document.createElement('div');handle.className='drag-handle';handle.innerHTML=`<span>${n.type==='file'?textEscape(n.name||'Arquivo').slice(0,75):n.type==='note'?'NOTA':n.type==='text'?'TEXTO':n.type==='rect'||n.type==='ellipse'?'FORMA':'ARRASTE PARA MOVER'}</span><span>⠿</span>`;el.append(handle);
+function render(){const fragment=document.createDocumentFragment();nodes.forEach(n=>{let el=document.createElement('div');el.className=`node ${n.type==='note'?'':n.type==='text'?'text':n.type==='rect'?'rect':n.type==='ellipse'?'ellipse':'media'}`;el.dataset.id=n.id;el.tabIndex=locked?-1:0;el.style.cssText=`left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;background:${n.color}`;if(n.id===selected)el.classList.add('selected');let handle=document.createElement('div');handle.className='drag-handle';handle.innerHTML=`<span>${n.type==='template'?'MODELO · '+textEscape(n.kind||'bloco').slice(0,30):n.type==='file'?textEscape(n.name||'Arquivo').slice(0,75):n.type==='note'?'NOTA':n.type==='text'?'TEXTO':n.type==='rect'||n.type==='ellipse'?'FORMA':'ARRASTE PARA MOVER'}</span><span>⠿</span>`;el.append(handle);
  if(['note','text'].includes(n.type)){const content=document.createElement('div');content.className='node-text';content.contentEditable=String(!locked);content.tabIndex=locked?-1:0;content.spellcheck=true;content.textContent=n.text||'';let before='';content.addEventListener('focus',()=>{selectNode(n.id);before=snapshot()});content.addEventListener('input',()=>{n.text=content.innerText.replace(/\u00a0/g,' ');scheduleSave()});content.addEventListener('blur',()=>{if(before!==snapshot()){history.push(before);if(history.length>45)history.shift();future=[];updateUndoButtons()}});el.append(content)}
+ if(n.type==='template'){renderTemplate(el,n)}
  if(n.type==='file'){if(n.preview==='image'&&n.src){const img=document.createElement('img');img.className='media-content';img.src=n.src;img.alt=n.name||'Imagem';img.draggable=false;el.append(img)}else{const body=document.createElement('div');body.className='file-content';const badge=document.createElement('div');badge.className='file-emoji';badge.textContent=fileIcon(n.mime);body.append(badge);const name=document.createElement('strong');name.textContent=n.name||'Documento';body.append(name);let info=document.createElement('small');info.textContent=n.note||'Arquivo anexado';body.append(info);if(n.src){let btn=document.createElement('button');btn.className='open-file';btn.textContent='Abrir / baixar';btn.addEventListener('pointerdown',e=>e.stopPropagation());btn.onclick=()=>downloadData(n.src,n.name||'arquivo');body.append(btn)}el.append(body)}}
+ if(n.href){const link=document.createElement('button');link.className='link-pill';link.textContent='↗ Abrir link';link.title=n.href;link.addEventListener('pointerdown',e=>e.stopPropagation());link.onclick=e=>{e.stopPropagation();openSafeLink(n.href)};el.append(link)}
  const resize=document.createElement('div');resize.className='resize-handle';resize.title='Arraste para redimensionar';el.append(resize);handle.addEventListener('pointerdown',e=>startNodeInteraction(e,n,'move'));resize.addEventListener('pointerdown',e=>startNodeInteraction(e,n,'resize'));
  el.addEventListener('pointerdown',e=>{if(tool==='link'){e.stopPropagation();if(touchGestureConsumed||pinch||activeTouches.size>1)return;
  if(e.pointerType==='touch'){interaction={kind:'pending-link',id:n.id,pointerId:e.pointerId};return}
- completeNodeLink(n.id);return}if(e.target.closest('.node-text')||e.target.closest('.open-file')){selectNode(n.id);return}if(e.target===el||e.target.tagName==='IMG'){startNodeInteraction(e,n,'move')}});
+ completeNodeLink(n.id);return}if(e.target.closest('.node-text')||e.target.closest('.template-body')||e.target.closest('.link-pill')||e.target.closest('.open-file')){selectNode(n.id);return}if(e.target===el||e.target.tagName==='IMG'){startNodeInteraction(e,n,'move')}});
  el.addEventListener('dblclick',e=>{const edit=$('.node-text',el);if(edit){edit.focus();const range=document.createRange();range.selectNodeContents(edit);range.collapse(false);const sel=window.getSelection();sel.removeAllRanges();sel.addRange(range)}});
  fragment.append(el)});nodesEl.replaceChildren(fragment);drawLines();$('#empty-hint').style.display=(nodes.length||arrows.length)?'none':'flex';const total=nodes.length+arrows.length;$('#count-label').textContent=`${total} elemento${total!==1?'s':''}`;selectNode(selected);}
 function completeNodeLink(id){
@@ -599,10 +693,15 @@ async function exportPng(){if(!nodes.length&&!paths.length&&!arrows.length)retur
 $('#welcome-close').onclick=()=>{$('#welcome-dialog').close();localStorage.setItem(OPENED_KEY,'1')};$('#welcome-dialog').addEventListener('close',()=>localStorage.setItem(OPENED_KEY,'1'));
 $$('[data-tool]').forEach(b=>b.onclick=()=>setTool(b.dataset.tool));$('#insert-files').onclick=$('#import-file').onclick=()=>{setToolsOpen(false);input.click()};$('#start-note').onclick=()=>{let p=centerWorld();addNode('note',p.x-110,p.y-80)};input.addEventListener('change',async e=>{await importFiles(input.files);input.value=''});
 $('#export-file').onclick=exportProject;$('#zoom-in').onclick=()=>zoomCenter(1.2);$('#zoom-out').onclick=()=>zoomCenter(1/1.2);$('#zoom-reset').onclick=()=>{zoomCenter(1/zoom)};$('#fit-view').onclick=fitView;$('[data-action=undo]').onclick=undo;$('[data-action=redo]').onclick=redo;$('#close-inspector').onclick=()=>selectNode(null);
-$('#node-color').oninput=e=>{const n=nodes.find(n=>n.id===selected);if(locked)return;const a=arrows.find(x=>x.id===selected);if(a){a.color=e.target.value;drawLines();scheduleSave();return}if(!n)return;n.color=e.target.value;const el=$(`.node[data-id="${n.id}"]`);if(el)el.style.background=n.color;scheduleSave()};$('#node-width').oninput=e=>{const n=nodes.find(n=>n.id===selected);if(locked)return;const a=arrows.find(x=>x.id===selected);if(a){a.width=Number(e.target.value);$('#width-label').textContent=a.width+' px (traço)';drawLines();scheduleSave();return}if(!n)return;n.w=Number(e.target.value);$('#width-label').textContent=n.w+' px';const el=$(`.node[data-id="${n.id}"]`);if(el)el.style.width=n.w+'px';drawLines();scheduleSave()};$('#duplicate-node').onclick=duplicateSelected;$('#delete-node').onclick=deleteSelected;title.addEventListener('input',scheduleSave);
+$('#node-color').oninput=e=>{const n=nodes.find(n=>n.id===selected);if(locked)return;const a=arrows.find(x=>x.id===selected);if(a){a.color=e.target.value;drawLines();scheduleSave();return}if(!n)return;n.color=e.target.value;const el=$(`.node[data-id="${n.id}"]`);if(el)el.style.background=n.color;scheduleSave()};$('#node-width').oninput=e=>{const n=nodes.find(n=>n.id===selected);if(locked)return;const a=arrows.find(x=>x.id===selected);if(a){a.width=Number(e.target.value);$('#width-label').textContent=a.width+' px (traço)';drawLines();scheduleSave();return}if(!n)return;n.w=Number(e.target.value);$('#width-label').textContent=n.w+' px';const el=$(`.node[data-id="${n.id}"]`);if(el)el.style.width=n.w+'px';drawLines();scheduleSave()};$('#arrow-bend').addEventListener('input',e=>{const a=arrows.find(x=>x.id===selected);if(locked||!a)return;a.curve=Number(e.target.value);drawLines();scheduleSave()});
+$('#arrow-straight').onclick=()=>{const a=arrows.find(x=>x.id===selected);if(!a||locked)return;checkpoint();a.curve=0;$('#arrow-bend').value=0;drawLines();scheduleSave()};
+$('#arrow-curved').onclick=()=>{const a=arrows.find(x=>x.id===selected);if(!a||locked)return;checkpoint();a.curve=a.curve||105;$('#arrow-bend').value=a.curve;drawLines();scheduleSave()};
+$('#save-node-link').onclick=()=>{const n=nodes.find(x=>x.id===selected);if(locked||!n)return;const raw=$('#node-link').value;if(raw.trim()&&!safeWebUrl(raw)){toast('Use um endereço http:// ou https:// válido.');return}checkpoint();n.href=safeWebUrl(raw);render();selectNode(n.id);scheduleSave();toast(n.href?'Hiperlink guardado.':'Hiperlink removido.')};
+$('#open-node-link').onclick=()=>{const n=nodes.find(x=>x.id===selected);if(n)openSafeLink(n.href)};
+$('#duplicate-node').onclick=duplicateSelected;$('#delete-node').onclick=deleteSelected;title.addEventListener('input',scheduleSave);
 viewport.addEventListener('pointerdown',pointerDown);window.addEventListener('pointermove',pointerMove);window.addEventListener('pointerup',pointerUp);window.addEventListener('pointercancel',pointerUp);
 viewport.addEventListener('wheel',e=>{if(e.target.closest('.node-text'))return;e.preventDefault();if(e.ctrlKey||e.metaKey){zoomAt(Math.exp(-e.deltaY*.008),e.clientX,e.clientY)}else if(e.altKey){zoomAt(Math.exp(-e.deltaY*.003),e.clientX,e.clientY)}else{ox-=e.deltaX;oy-=e.deltaY;updateCamera();scheduleSave()}},{passive:false});
-window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,[contenteditable]'))return;const mod=e.ctrlKey||e.metaKey;if(locked){if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject()}else if(e.key==='Delete'||e.key==='Backspace'||(mod&&['z','y','d'].includes(e.key.toLowerCase())))e.preventDefault();return;}if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return}if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject();return}if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected();return}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();return}if(e.key==='Escape'){closeFolders();setToolsOpen(false);selected=null;selectNode(null);setTool('select');return}if(e.code==='Space'){spaceHeld=true;viewport.classList.add('hand');e.preventDefault();return}const short={v:'select',h:'hand',n:'note',t:'text',r:'rect',o:'ellipse',p:'pen',a:'arrow',c:'curved-arrow',l:'link'};if(!mod&&short[e.key.toLowerCase()])setTool(short[e.key.toLowerCase()])});window.addEventListener('keyup',e=>{if(e.code==='Space'){spaceHeld=false;viewport.classList.toggle('hand',tool==='hand')}});
+window.addEventListener('keydown',e=>{if(e.target.matches('input,textarea,[contenteditable]'))return;const mod=e.ctrlKey||e.metaKey;if(locked){if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject()}else if(e.key==='Delete'||e.key==='Backspace'||(mod&&['z','y','d'].includes(e.key.toLowerCase())))e.preventDefault();return;}if(mod&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}if(mod&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return}if(mod&&e.key.toLowerCase()==='s'){e.preventDefault();exportProject();return}if(mod&&e.key.toLowerCase()==='d'){e.preventDefault();duplicateSelected();return}if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();deleteSelected();return}if(e.key==='Escape'){closeCreateMenu();closeFolders();setToolsOpen(false);selected=null;selectNode(null);setTool('select');return}if(e.code==='Space'){spaceHeld=true;viewport.classList.add('hand');e.preventDefault();return}const short={v:'select',h:'hand',n:'note',t:'text',r:'rect',o:'ellipse',p:'pen',a:'arrow',c:'curved-arrow',l:'link'};if(!mod&&short[e.key.toLowerCase()])setTool(short[e.key.toLowerCase()])});window.addEventListener('keyup',e=>{if(e.code==='Space'){spaceHeld=false;viewport.classList.toggle('hand',tool==='hand')}});
 viewport.addEventListener('dragenter',e=>{e.preventDefault();document.body.classList.add('dragging-files')});viewport.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy'});viewport.addEventListener('dragleave',e=>{if(!viewport.contains(e.relatedTarget))document.body.classList.remove('dragging-files')});viewport.addEventListener('drop',e=>{e.preventDefault();document.body.classList.remove('dragging-files');if(locked){toast('Destrave o quadro para importar arquivos.');return;}importFiles(e.dataTransfer.files,toWorld(e.clientX,e.clientY))});
 window.addEventListener('beforeunload',()=>{if(saveTimer)clearTimeout(saveTimer)});
 // Pinça estável: amortecimento, zona neutra e âncora fixa no ponto entre os dedos.
