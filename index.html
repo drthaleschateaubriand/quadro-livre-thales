@@ -143,6 +143,36 @@
 .tree-actions button{border:1px solid #c6d5f1;background:#fff;color:#4c65b0;width:23px;height:23px;border-radius:50%;font-size:15px;line-height:20px;cursor:pointer}
 .tree-caption{font-size:11px;color:#7e8ba2}
 @media(max-width:760px){.tree-surface{min-height:290px}.special-header{flex-wrap:wrap}}
+
+/* Timeline de tarefas com datas e agenda mensal */
+.timeline-pane{min-width:1050px;overflow:hidden;background:#fff;border:1px solid #e0e7f3;border-radius:12px}
+.timeline-head,.timeline-row{display:grid;grid-template-columns:265px 1fr;min-height:61px;border-bottom:1px solid #e8edf5}
+.timeline-head{min-height:46px;background:#f6f8fd}
+.timeline-label{padding:9px 12px;border-right:1px solid #e1e7f1;display:flex;flex-direction:column;gap:4px;justify-content:center;min-width:0}
+.timeline-label strong{font-size:13px}
+.timeline-label input[type=text]{width:100%;border:0;background:transparent;color:#243855;font-size:13px;font-weight:650;padding:2px 0;outline:none}
+.timeline-label input[type=date]{min-width:0;max-width:114px;font-size:10px;color:#60728a;border:1px solid #e2e8f2;border-radius:5px;padding:2px}
+.timeline-label .date-pair{display:flex;gap:6px;align-items:center}
+.timeline-label .timeline-remove{border:0;background:none;color:#a4afbe;cursor:pointer;margin-left:auto;font-size:16px}
+.timeline-grid{position:relative;min-width:0;background:repeating-linear-gradient(to right,transparent 0,transparent calc(100% / 12 - 1px),#e5ebf4 calc(100% / 12 - 1px),#e5ebf4 calc(100% / 12))}
+.timeline-weeks{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));height:100%;align-items:center}
+.timeline-weeks>span{font-size:10px;text-align:center;color:#6e7d95;line-height:1.35}
+.timeline-bar{position:absolute;top:18px;height:26px;background:#fff0ae;border:1px solid #e1bb49;border-radius:8px;display:flex;align-items:center;padding:0 9px;white-space:nowrap;font-size:11px;color:#6c592e;overflow:hidden;text-overflow:ellipsis}
+.timeline-bar:nth-child(even){background:#dfeafa;border-color:#94b2df;color:#38547c}
+.timeline-placeholder{position:absolute;top:22px;left:15px;font-size:11px;color:#abb6c7}
+.special-caption{font-size:11px;color:#8591a4;margin:8px 0 0}
+.agenda-shell{min-width:750px;border:1px solid #e1e7f1;border-radius:13px;overflow:hidden}
+.agenda-headings{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));background:#f1f5fc}
+.agenda-headings>span{text-align:center;padding:10px 4px;font-size:11px;font-weight:700;color:#61738f}
+.agenda-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:minmax(98px,auto)}
+.agenda-day{border:1px solid #ebeff6;min-width:0;padding:5px 6px;background:#fff}
+.agenda-day.outside{background:#f6f8fc;opacity:.58}
+.agenda-day.today{background:#f4f7ff}
+.agenda-day .day-header{display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:#5c6c83;margin-bottom:5px}
+.agenda-day .day-add{border:0;background:transparent;color:#4d71d1;font-weight:800;font-size:18px;padding:0 5px;cursor:pointer}
+.agenda-event{display:block;width:100%;text-align:left;padding:4px 5px;margin:3px 0;background:#e6eeff;color:#3e5894;border:1px solid #cad8f8;border-radius:6px;line-height:1.3;font-size:10px;word-wrap:break-word;cursor:pointer}
+.agenda-day .day-count{font-size:10px;color:#8090a5}
+@media(max-width:760px){.timeline-pane{min-width:850px}.timeline-head,.timeline-row{grid-template-columns:225px 1fr}.timeline-label input[type=date]{max-width:93px;font-size:9px}.agenda-shell{min-width:700px}}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -660,6 +690,136 @@ function renderTreeTemplate(el,n){
   surface.append(card)
  }
  body.append(surface);const cap=document.createElement('p');cap.className='tree-caption';cap.textContent=n.kind==='mindmap'?'Adicione ramificações e edite os textos diretamente.':'Adicione cargos e subordinados; as linhas se reorganizam automaticamente.';body.append(cap);el.append(body)
+}
+
+
+function localDateString(date){return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-')}
+function localMonthString(date){return localDateString(date).slice(0,7)}
+function dateOnly(value){const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value||''));return m?new Date(+m[1],+m[2]-1,+m[3]):new Date()}
+function datePlus(iso,days){const d=dateOnly(iso);d.setDate(d.getDate()+days);return localDateString(d)}
+function startOfWeek(date){const d=new Date(date);d.setHours(12,0,0,0);d.setDate(d.getDate()-(d.getDay()+6)%7);return localDateString(d)}
+function dayDifference(a,b){const d=s=>{const m=s.split('-').map(Number);return Date.UTC(m[0],m[1]-1,m[2])};return Math.round((d(a)-d(b))/86400000)}
+function addDaysFromToday(num){return datePlus(localDateString(new Date()),num)}
+function updateStructuredNode(n){render();selectNode(n.id);scheduleSave()}
+function renderTimelineTemplate(el,n){
+ const body=document.createElement('div');body.className='template-body special-template';
+ if(!n.timelineStart)n.timelineStart=startOfWeek(dateOnly(localDateString(new Date())));
+ if(!Array.isArray(n.timelineTasks)){
+  n.timelineTasks=(n.items||[]).map((item,i)=>({id:uid(),name:item.label||'Tarefa '+(i+1),start:addDaysFromToday(i*6),end:addDaysFromToday(i*6+9)}));
+ }
+ specialHeader(n,body,[
+  {label:'◀ 4 sem.',action:()=>{n.timelineStart=datePlus(n.timelineStart,-28);updateStructuredNode(n)}},
+  {label:'Hoje',action:()=>{n.timelineStart=startOfWeek(new Date());updateStructuredNode(n)}},
+  {label:'4 sem. ▶',action:()=>{n.timelineStart=datePlus(n.timelineStart,28);updateStructuredNode(n)}},
+  {label:'＋ Tarefa',edit:true,action:()=>{
+   checkpoint();const first=datePlus(n.timelineStart,7);
+   n.timelineTasks.push({id:uid(),name:'Nova tarefa',start:first,end:datePlus(first,12)});
+   updateStructuredNode(n)
+  }}
+ ]);
+ const pane=document.createElement('div');pane.className='timeline-pane';
+ const head=document.createElement('div');head.className='timeline-head';
+ const label=document.createElement('div');label.className='timeline-label';label.innerHTML='<strong>Tarefas e períodos</strong><small style="font-size:10px;color:#8490a4">12 semanas no quadro</small>';
+ const dates=document.createElement('div');dates.className='timeline-weeks';
+ for(let i=0;i<12;i++){const span=document.createElement('span');const d=datePlus(n.timelineStart,i*7);
+  span.textContent=dateOnly(d).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'});dates.append(span)}
+ head.append(label,dates);pane.append(head);
+ for(const task of n.timelineTasks){
+  const row=document.createElement('div');row.className='timeline-row';
+  const side=document.createElement('div');side.className='timeline-label';
+  const titleRow=document.createElement('div');titleRow.style.display='flex';titleRow.style.alignItems='center';
+  const name=document.createElement('input');name.type='text';name.value=task.name||'Tarefa';name.disabled=locked;name.setAttribute('aria-label','Nome da tarefa');name.maxLength=150;
+  let original='';name.onfocus=()=>{original=snapshot();selectNode(n.id)};
+  name.oninput=()=>{task.name=name.value;scheduleSave()};
+  name.onblur=()=>{if(original&&snapshot()!==original){history.push(original);if(history.length>45)history.shift();future=[];updateUndoButtons()}};
+  titleRow.append(name);
+  if(!locked){const del=document.createElement('button');del.className='timeline-remove';del.type='button';del.title='Excluir tarefa';del.textContent='×';
+   del.onclick=()=>{checkpoint();n.timelineTasks=n.timelineTasks.filter(t=>t.id!==task.id);updateStructuredNode(n)};titleRow.append(del)}
+  side.append(titleRow);
+  const datesBox=document.createElement('div');datesBox.className='date-pair';
+  for(const key of ['start','end']){
+   const d=document.createElement('input');d.type='date';d.value=task[key];d.disabled=locked;d.title=key==='start'?'Data inicial':'Data final';d.setAttribute('aria-label',d.title);
+   d.onchange=()=>{checkpoint();task[key]=d.value||task[key];
+    if(dayDifference(task.end,task.start)<0)task.end=task.start;updateStructuredNode(n)};
+   datesBox.append(d)
+  }
+  side.append(datesBox);
+  const track=document.createElement('div');track.className='timeline-grid';
+  const start=dayDifference(task.start,n.timelineStart),end=dayDifference(task.end,n.timelineStart);
+  const from=Math.max(0,start),to=Math.min(84,end+1);
+  if(to>from){
+   const bar=document.createElement('div');bar.className='timeline-bar';
+   bar.style.left=(from/84*100)+'%';bar.style.width=((to-from)/84*100)+'%';
+   bar.title=task.name+' · '+task.start+' a '+task.end;bar.textContent=task.name||'Tarefa';
+   track.append(bar)
+  }else{const hint=document.createElement('span');hint.className='timeline-placeholder';hint.textContent='Fora do período visível';track.append(hint)}
+  row.append(side,track);pane.append(row)
+ }
+ body.append(pane);const info=document.createElement('p');info.className='special-caption';info.textContent='Altere as datas para mover ou alongar as barras. Use as setas superiores para navegar pelas semanas.';body.append(info);el.append(body)
+}
+function renderAgendaTemplate(el,n){
+ const body=document.createElement('div');body.className='template-body special-template';
+ if(!n.month)n.month=localMonthString(new Date());
+ if(!Array.isArray(n.events))n.events=[];
+ const year=Number(n.month.slice(0,4)),month=Number(n.month.slice(5,7));
+ const displayDate=new Date(year,month-1,1);
+ const titleMonth=displayDate.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+ specialHeader(n,body,[
+  {label:'◀',action:()=>{n.month=localMonthString(new Date(year,month-2,1));updateStructuredNode(n)}},
+  {label:titleMonth,action:()=>{n.month=localMonthString(new Date());updateStructuredNode(n)}},
+  {label:'▶',action:()=>{n.month=localMonthString(new Date(year,month,1));updateStructuredNode(n)}},
+  {label:'＋ Compromisso',edit:true,action:()=>addEvent(localDateString(new Date(year,month-1,Math.min(15,new Date(year,month,0).getDate()))))}
+ ]);
+ function addEvent(day){
+  if(locked)return;
+  const name=prompt('Compromisso para '+dateOnly(day).toLocaleDateString('pt-BR')+':','Novo compromisso');
+  if(name===null||!name.trim())return;
+  const time=prompt('Horário opcional (ex.: 09:30):','09:00');
+  if(time===null)return;
+  checkpoint();n.events.push({id:uid(),date:day,time:/^\d{2}:\d{2}$/.test(time.trim())?time.trim():'',name:name.trim()});
+  updateStructuredNode(n)
+ }
+ function editEvent(event){
+  if(locked)return;
+  const name=prompt('Editar compromisso (deixe vazio para excluir):',event.name);
+  if(name===null)return;
+  if(!name.trim()){
+   if(confirm('Excluir compromisso?')){checkpoint();n.events=n.events.filter(x=>x.id!==event.id);updateStructuredNode(n)}
+   return
+  }
+  const time=prompt('Horário:',event.time||'');
+  if(time===null)return;
+  const date=prompt('Data (AAAA-MM-DD):',event.date);
+  if(date===null)return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||localDateString(dateOnly(date))!==date){toast('Data inválida. Use AAAA-MM-DD.');return}
+  checkpoint();event.name=name.trim();event.time=/^\d{2}:\d{2}$/.test(time.trim())?time.trim():'';event.date=date;updateStructuredNode(n)
+ }
+ const shell=document.createElement('div');shell.className='agenda-shell';
+ const weekdays=document.createElement('div');weekdays.className='agenda-headings';
+ for(const day of ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom']){const d=document.createElement('span');d.textContent=day;weekdays.append(d)}
+ shell.append(weekdays);
+ const grid=document.createElement('div');grid.className='agenda-grid';
+ const offset=(displayDate.getDay()+6)%7;
+ const daysInMonth=new Date(year,month,0).getDate(),count=Math.ceil((offset+daysInMonth)/7)*7;
+ const firstDate=new Date(year,month-1,1-offset),today=localDateString(new Date());
+ for(let k=0;k<count;k++){
+  const d=new Date(firstDate);d.setDate(firstDate.getDate()+k);
+  const iso=localDateString(d),cell=document.createElement('div');
+  cell.className='agenda-day'+(d.getMonth()!==month-1?' outside':'')+(iso===today?' today':'');
+  const head=document.createElement('div');head.className='day-header';
+  const number=document.createElement('span');number.textContent=String(d.getDate());head.append(number);
+  if(!locked){const plus=document.createElement('button');plus.className='day-add';plus.type='button';plus.textContent='+';plus.title='Adicionar compromisso';plus.onclick=()=>addEvent(iso);head.append(plus)}
+  cell.append(head);
+  const items=n.events.filter(evt=>evt.date===iso).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+  for(const evt of items.slice(0,4)){
+   const btn=document.createElement('button');btn.className='agenda-event';btn.textContent=(evt.time?evt.time+' ':'')+evt.name;
+   btn.title=locked?evt.name:'Editar compromisso';btn.onclick=()=>editEvent(evt);cell.append(btn)
+  }
+  if(items.length>4){const small=document.createElement('span');small.className='day-count';small.textContent='+'+(items.length-4)+' compromissos';cell.append(small)}
+  grid.append(cell)
+ }
+ shell.append(grid);body.append(shell);
+ const caption=document.createElement('p');caption.className='special-caption';caption.textContent='Toque no + de um dia para registrar um compromisso. Selecione um evento para editar data, horário ou descrição.';body.append(caption);el.append(body)
 }
 
 function renderTemplate(el,n){
