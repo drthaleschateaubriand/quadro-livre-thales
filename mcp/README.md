@@ -17,7 +17,7 @@
 ## Pré-requisitos de ativação
 
 1. No Firebase, confirmar que Authentication (E-mail/Senha) e Firestore estão configurados e que as **Security Rules privadas** foram implantadas. Há uma proposta separada com regras em `firebase-auth-cloud-sync`. A existência do arquivo no GitHub não publica essas regras.
-2. Confirmar que o Quadro Livre envia as pastas e quadros para `workspaces/{user.uid}/boards/{boardId}` no Firestore, com `fields.payload` contendo JSON (como no projeto de integração em testes). Um botão Conta sozinho não sincroniza quadros.
+2. Nesta ramificação do GitHub o Quadro Livre possui `cloud-workspace.js`: após entrar com o Firebase, abra **Conta → Enviar quadros locais**. Em outro computador entre na mesma conta e escolha **Conta → Abrir quadros da nuvem**. O esquema Firestore usa `workspaces/{user.uid}/boards/{boardId}` com `fields.payload` contendo JSON. As regras `firestore.rules` precisam estar publicadas antes do primeiro envio.
 3. Ter conta Cloudflare com Workers e KV habilitados.
 4. Dispor de acesso a configurar o plugin no ChatGPT. A conexão OAuth será concluída pelo usuário no navegador do ChatGPT.
 
@@ -70,7 +70,7 @@ Com o plugin conectado, experimente:
 ## Problemas conhecidos e limites
 
 - **Sem Cloudflare configurado, este código não está no ar.** Não existe link MCP funcional até publicar o Worker.
-- **Sem sincronização Firestore ativa no site, os quadros locais não estarão disponíveis ao plugin.** O site permanece no navegador e os arquivos binários em IndexedDB.
+- **Sem executar o primeiro envio pelo botão Conta, os quadros locais não estarão disponíveis ao plugin.** A sincronização é manual nesta etapa; um login sozinho não envia os documentos. Anexos binários permanecem em IndexedDB, mesmo após enviar o JSON do quadro.
 - As ferramentas operam **somente no workspace do usuário autenticado**. Convites de editor/leitor, colaboração simultânea e revisões compartilhadas ainda não foram integrados ao conector.
 - A sincronização do navegador não é tempo real: uma nota criada pelo ChatGPT precisará de recarregamento/recuperação do quadro no site. Editar simultaneamente o site e o plugin pode causar conflitos; o plugin usa controle de versão, mas o site deve usar a mesma estratégia para resolução completa.
 - Limite de aproximadamente 750 kB por pasta/quadro. Para grandes documentos e PDFs é preciso Storage e um pipeline específico.
@@ -87,3 +87,7 @@ Documentação de referência:
 - https://developers.openai.com/plugins/build/mcp-server
 - https://github.com/cloudflare/workers-oauth-provider
 - https://firebase.google.com/docs/firestore/use-rest-api
+
+## Progresso do cliente web
+
+Nesta branch, o site também ganhou dois controles na seção Conta: `Enviar quadros locais` e `Abrir quadros da nuvem`. `cloud-workspace.js` usa a sessão do Firebase SDK já existente, nunca uma conta administrativa. Antes de trocar quadros, o navegador salva um backup JSON local e pede confirmação. A integração precisa de testes num projeto Firestore configurado com regras privadas. Enquanto essa branch não for incorporada ao ramo público, os botões não aparecerão no site publicado.
