@@ -222,24 +222,46 @@
 .slide-display.two-columns .present-extra,.slide-display.two-columns .present-photo{grid-column:2;grid-row:2/span 2}
 .slide-display .present-extra{font-size:19px;padding:20px;border-radius:10px;background:#e3ecf9;white-space:pre-wrap}
 
-/* Barra contextual compacta: controles surgem apenas no elemento selecionado. */
+/* Barra contextual discreta, semelhante ao menu flutuante do Miro. */
 #inspector{display:none!important}
-.context-toolbar{position:fixed;z-index:40;left:12px;top:86px;max-width:calc(100vw - 16px);filter:drop-shadow(0 6px 17px #1a284833)}
-.context-toolbar[hidden]{display:none!important}
-.context-controls{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:7px 8px;background:#fff;border:1px solid #dce3ef;border-radius:13px;box-shadow:0 3px 16px #233c6b20;max-width:min(790px,calc(100vw - 16px))}
-.context-controls label{display:inline-flex;align-items:center;gap:5px;color:#576682;font-size:11px;font-weight:650;white-space:nowrap;padding:3px 4px}
-.context-controls input[type=color]{height:30px;width:32px;border:1px solid #d4deee;border-radius:7px;padding:2px;background:white;cursor:pointer}
-.context-controls input[type=number]{width:54px;height:29px;border:1px solid #d8e1ee;border-radius:6px;text-align:center;padding:3px;color:#293c5f;font-size:12px}
-.context-controls label span{font-size:10px;color:#8b9ab0}
-.context-controls button,.context-more summary{border:1px solid #d8e2f0;border-radius:8px;background:#fff;color:#415b9a;padding:5px 9px;font-size:12px;min-height:30px;cursor:pointer}
-.context-controls button:hover,.context-more summary:hover{background:#eef2ff}
-.context-divider{height:26px;width:1px;background:#e0e6ef;margin:0 2px}
+.context-toolbar{position:fixed;z-index:40;left:12px;top:86px;max-width:calc(100vw - 16px);filter:drop-shadow(0 7px 15px #1b2d4d20)}
+.context-toolbar[hidden],.context-popover[hidden],.context-pane[hidden]{display:none!important}
+.context-controls{display:flex;align-items:center;gap:5px;width:max-content;max-width:calc(100vw - 16px);height:47px;padding:5px 7px;border:1px solid #dce3ef;border-radius:13px;background:#fff;box-shadow:0 3px 14px #233c6b1b}
+.context-controls .ctx-icon,.context-controls .context-dismiss{width:35px;height:34px;min-height:34px;display:grid;place-items:center;border:0;border-radius:8px;background:transparent;color:#3a4a6a;padding:0;cursor:pointer;font-size:20px;font-weight:650}
+.context-controls .ctx-icon:hover,.context-controls .ctx-icon[aria-expanded=true],.context-controls .context-dismiss:hover{background:#edf1ff;color:#455fbd}
+.context-controls .ctx-icon:disabled{opacity:.3;cursor:not-allowed}
+.context-controls .ctx-icon[hidden]{display:none!important}
+.ctx-fill-icon{display:block;width:20px;height:20px;background:linear-gradient(135deg,#ffffff 50%,#e0a758 50%);border:1.5px solid #536789;border-radius:4px;transform:rotate(-7deg)}
+.ctx-a-icon{font-weight:800;font-size:18px;text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:5px}
+.context-divider{height:25px;width:1px;background:#e2e7f1;margin:0 2px}
 .context-more{position:relative}
-.context-more summary{list-style:none;font-size:19px;min-width:32px;display:grid;place-items:center}
+.context-more summary{width:35px;height:34px;display:grid;place-items:center;list-style:none;border-radius:8px;cursor:pointer;font-size:21px;color:#3d5374}
+.context-more summary:hover{background:#edf1ff}
 .context-more summary::-webkit-details-marker{display:none}
-.context-menu{position:absolute;right:0;top:36px;display:flex;flex-direction:column;gap:3px;width:184px;padding:7px;background:white;border:1px solid #dde5f1;border-radius:11px;box-shadow:0 11px 25px #1b365037;z-index:42}
-.context-menu button{text-align:left;width:100%;border:0;font-weight:500}
-.context-dismiss{font-size:18px!important;min-width:28px;padding:4px!important}
+.context-menu{position:absolute;right:0;top:39px;display:flex;flex-direction:column;gap:3px;width:190px;padding:7px;background:#fff;border:1px solid #dae2ed;border-radius:11px;box-shadow:0 9px 26px #172d502e;z-index:43}
+.context-menu button{background:#fff;text-align:left;border:0;border-radius:7px;padding:9px;color:#344b73;font-size:12px}
+.context-menu button:hover{background:#edf2ff}
+.context-more button[hidden]{display:none}
+.context-popover{position:absolute;left:0;top:53px;min-width:205px;width:min(250px,calc(100vw - 16px));padding:13px;background:#fff;border:1px solid #dbe3f0;border-radius:12px;box-shadow:0 12px 35px #1d35523c;z-index:44}
+.context-popover strong{display:block;font-size:12px;color:#314462;margin-bottom:12px}
+.context-popover label{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px;color:#62718d;margin-top:10px}
+.context-popover input[type=color]{width:42px;height:32px;border:1px solid #d3deeb;border-radius:8px;background:white;padding:2px}
+.context-popover input[type=number]{width:61px;height:33px;border-radius:7px;border:1px solid #d6dfea;padding:3px 6px;text-align:center;font-size:13px;color:#344b77}
+.ctx-swatches{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.ctx-swatches button{aspect-ratio:1;width:100%;border-radius:7px;border:1px solid #cbd6e7;cursor:pointer;box-shadow:0 1px 3px #273c6315}
+.ctx-swatches button:focus-visible{outline:2px solid #5c7ee0;outline-offset:1px}
+.ctx-stepper{display:flex;align-items:center;gap:9px;justify-content:space-between}
+.ctx-stepper .ctx-step{border-radius:8px;width:35px;height:34px;background:#f0f3fc;border:1px solid #d9e2f1;color:#435da0;font-size:21px}
+.ctx-stepper span,.ctx-sizing span{font-size:11px;color:#93a0b2}
+.ctx-sizing{display:flex;flex-direction:column;gap:9px}
+.ctx-sizing label{margin:0}
+.ctx-sizing label input{margin-left:auto}
+@media(max-width:740px){
+ .context-toolbar{top:75px;left:8px;max-width:calc(100vw - 16px)}
+ .context-controls{height:44px;gap:3px;padding:4px 5px}
+ .context-controls .ctx-icon,.context-controls .context-dismiss,.context-more summary{width:32px;height:32px}
+ .context-popover{top:49px}
+}
 .node .node-text{font-size:var(--ql-font-size,16px)!important;color:var(--ql-font-color,#243047)!important}
 .node.text .node-text{font-size:var(--ql-font-size,21px)!important}
 .node .template-body .template-title{font-size:calc(var(--ql-font-size,18px)*1.2);color:var(--ql-font-color,#243047)}
@@ -328,27 +350,55 @@
     </div>
     <div id="drop-hint">Solte seus arquivos para inserir no quadro</div>
   </main>
-  <div id="context-toolbar" class="context-toolbar" hidden role="toolbar" aria-label="Editar elemento selecionado">
-  <div class="context-controls">
-    <label title="Cor de fundo">Fundo <input type="color" id="context-bg" value="#fff1b8" aria-label="Cor de fundo"></label>
-    <label title="Cor do texto">Letra <input type="color" id="context-fg" value="#243047" aria-label="Cor da letra"></label>
-    <label title="Tamanho da fonte">Fonte <input type="number" id="context-font" min="10" max="72" value="16" aria-label="Tamanho da fonte" inputmode="numeric"><span>px</span></label>
-    <span class="context-divider" aria-hidden="true"></span>
-    <label title="Largura do quadrinho">Larg. <input type="number" id="context-width" min="120" max="1600" value="300" inputmode="numeric" aria-label="Largura do quadrinho"><span>px</span></label>
-    <label title="Altura do quadrinho">Alt. <input type="number" id="context-height" min="55" max="1200" value="195" inputmode="numeric" aria-label="Altura do quadrinho"><span>px</span></label>
-    <button id="context-add-child" type="button" title="Adicionar ramificação" hidden>＋ Ramo</button>
-    <details id="context-more" class="context-more">
-      <summary title="Outras ações" aria-label="Outras ações">⋯</summary>
-      <div class="context-menu">
-        <button id="context-duplicate" type="button">Duplicar elemento</button>
-        <button id="context-link" type="button">Adicionar hyperlink</button>
-        <button id="context-curvature" type="button" hidden>Curvatura da seta</button>
-        <button id="context-move" type="button">Mover para pasta</button>
-        <button id="context-delete" type="button">Excluir elemento</button>
-      </div>
-    </details>
-    <button id="context-close" class="context-dismiss" title="Fechar ferramentas" aria-label="Fechar ferramentas" type="button">×</button>
+  <div id="context-toolbar" class="context-toolbar" hidden role="toolbar" aria-label="Ferramentas do objeto selecionado">
+ <div class="context-controls">
+  <button type="button" id="context-show-bg" class="ctx-icon" data-context-panel="bg" title="Cor do quadrinho" aria-label="Cor de fundo" aria-expanded="false"><span class="ctx-fill-icon" aria-hidden="true"></span></button>
+  <button type="button" id="context-show-fg" class="ctx-icon" data-context-panel="fg" title="Cor do texto" aria-label="Cor da fonte" aria-expanded="false"><span class="ctx-a-icon" aria-hidden="true">A</span></button>
+  <button type="button" id="context-show-font" class="ctx-icon" data-context-panel="font" title="Tamanho da fonte" aria-label="Tamanho da fonte" aria-expanded="false"><span aria-hidden="true">Tᵗ</span></button>
+  <button type="button" id="context-show-size" class="ctx-icon" data-context-panel="size" title="Largura e altura do quadrinho" aria-label="Tamanho do quadrinho" aria-expanded="false"><span aria-hidden="true">▣</span></button>
+  <span class="context-divider" aria-hidden="true"></span>
+  <button type="button" id="context-add-child" class="ctx-icon" title="Adicionar ramificação" aria-label="Adicionar ramificação" hidden>＋</button>
+  <button type="button" id="context-direct-link" class="ctx-icon" title="Adicionar hyperlink" aria-label="Adicionar hyperlink">↗</button>
+  <details id="context-more" class="context-more">
+   <summary title="Mais opções" aria-label="Mais opções">⋯</summary>
+   <div class="context-menu">
+    <button id="context-duplicate" type="button">Duplicar elemento</button>
+    <button id="context-link" type="button">Adicionar hyperlink</button>
+    <button id="context-curvature" type="button" hidden>Curvatura da seta</button>
+    <button id="context-move" type="button">Mover para pasta</button>
+    <button id="context-delete" type="button">Excluir elemento</button>
+   </div>
+  </details>
+  <button id="context-close" class="context-dismiss" title="Fechar ferramentas" aria-label="Fechar ferramentas" type="button">×</button>
+ </div>
+ <div id="context-popover" class="context-popover" hidden aria-label="Personalizar objeto">
+  <div class="context-pane" data-pane="bg" hidden>
+   <strong>Cor de fundo</strong>
+   <div class="ctx-swatches" data-colors="bg"></div>
+   <label>Escolher outra cor <input type="color" id="context-bg" value="#fff1b8" aria-label="Escolher cor de fundo"></label>
   </div>
+  <div class="context-pane" data-pane="fg" hidden>
+   <strong>Cor do texto</strong>
+   <div class="ctx-swatches" data-colors="fg"></div>
+   <label>Escolher outra cor <input type="color" id="context-fg" value="#243047" aria-label="Escolher cor de fonte"></label>
+  </div>
+  <div class="context-pane" data-pane="font" hidden>
+   <strong>Tamanho da fonte</strong>
+   <div class="ctx-stepper">
+    <button type="button" class="ctx-step" data-step-font="-2" aria-label="Diminuir fonte">−</button>
+    <input type="number" id="context-font" min="10" max="72" step="1" value="16" inputmode="numeric" aria-label="Tamanho da fonte">
+    <span>px</span>
+    <button type="button" class="ctx-step" data-step-font="2" aria-label="Aumentar fonte">＋</button>
+   </div>
+  </div>
+  <div class="context-pane" data-pane="size" hidden>
+   <strong>Tamanho do quadrinho</strong>
+   <div class="ctx-sizing">
+    <label>Largura <input type="number" id="context-width" min="120" max="1600" value="300" inputmode="numeric" aria-label="Largura do quadrinho"><span>px</span></label>
+    <label>Altura <input type="number" id="context-height" min="55" max="1200" value="195" inputmode="numeric" aria-label="Altura do quadrinho"><span>px</span></label>
+   </div>
+  </div>
+ </div>
 </div>
 <aside id="inspector" class="inspector" hidden>
     <div class="inspector-head"><strong>Propriedades</strong><button id="close-inspector" class="icon-button" aria-label="Fechar">×</button></div>
