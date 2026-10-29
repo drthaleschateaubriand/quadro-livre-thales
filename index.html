@@ -221,6 +221,43 @@
 .slide-display.two-columns #slide-heading,.slide-display.two-columns #slide-description{grid-column:1}
 .slide-display.two-columns .present-extra,.slide-display.two-columns .present-photo{grid-column:2;grid-row:2/span 2}
 .slide-display .present-extra{font-size:19px;padding:20px;border-radius:10px;background:#e3ecf9;white-space:pre-wrap}
+
+/* Quadro Livre v1.7 - painel de estilos e cores personalizáveis */
+.styles-toggle{height:38px;border:1px solid #d9e0ed;border-radius:10px;padding:0 10px;display:flex;gap:7px;align-items:center;justify-content:center;color:#43516f;background:#fff;font-size:12px;font-weight:700}
+.styles-toggle:hover,.styles-toggle[aria-expanded="true"]{background:#f1f0ff;color:#5b43b5;border-color:#b1a5e8}
+.styles-panel{position:absolute;top:83px;right:14px;bottom:13px;width:min(326px,calc(100vw - 28px));z-index:21;background:#fff;border:1px solid #e1e6ef;box-shadow:0 15px 45px #2533492b;border-radius:18px;overflow:auto;padding:18px 18px 22px}
+.styles-panel[hidden]{display:none}
+body.styles-open #inspector{display:none}
+.styles-heading{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ebedf3;padding-bottom:12px;font-size:17px}
+.style-section{padding:15px 0 17px;border-bottom:1px solid #ecf0f5}
+.style-section>strong{font-size:13px;color:#29364d;display:block;margin:0 0 7px}
+.style-section>p{margin:0 0 12px;color:#79859a;font-size:11px;line-height:1.45}
+.style-section>label:not(.style-checkbox){display:block;margin:10px 0 7px;color:#53617b;font-size:11px}
+.style-pair{display:flex;align-items:center;gap:9px;margin-top:8px;font-family:monospace;color:#687893;font-size:11px}
+.style-pair input[type=color]{width:46px;height:34px;padding:2px;border:1px solid #dde5ef;border-radius:8px;background:#fff}
+.style-section input[type=range]{width:100%;accent-color:#6857da}
+.styles-swatches{display:flex;gap:6px;flex-wrap:wrap}
+.style-swatch{width:29px;height:29px;min-width:29px;border-radius:8px;border:1px solid #cbd4e2;box-shadow:0 1px 3px #1b274010;position:relative}
+.style-swatch.active{outline:2px solid #5f65df;outline-offset:2px}
+.palette-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.palette-choice{border:1px solid #e0e6f1;background:#fff;border-radius:11px;padding:6px;min-height:68px;text-align:left;cursor:pointer}
+.palette-choice.active{outline:2px solid #655cf1;outline-offset:1px}
+.palette-choice .palette-stripes{display:flex;overflow:hidden;height:29px;border-radius:7px}
+.palette-choice .palette-stripes span{flex:1}
+.palette-choice small{font-size:11px;display:block;color:#58657e;margin-top:6px}
+.styles-apply{padding:8px 10px;border:1px solid #d8ddf1;background:#fff;border-radius:8px;color:#485ca3;font-size:11px;margin-top:10px;width:100%}
+.styles-apply:disabled{opacity:.45}
+.brush-preview{height:47px;background:#f7f9fc;border:1px solid #e7ebf3;border-radius:9px;display:grid;place-items:center;margin-top:10px}
+.brush-preview span{display:block;width:140px;border-radius:40px;min-height:1px;background:#344f81}
+.style-checkbox{display:flex;align-items:center;gap:7px;font-size:12px;color:#52617c;margin-top:12px}
+.styles-footnote{font-size:10px;line-height:1.55;color:#8290a5;margin:15px 0 0}
+.node .node-text{color:var(--ql-font-color,#243047);font-size:var(--ql-font-size,16px)}
+.node.text .node-text{font-size:var(--ql-font-size,21px)}
+.node.template .template-title,.node.template .template-item .item-label{color:var(--ql-font-color,#243047)}
+.node.template .template-body{color:var(--ql-font-color,#243047)}
+.node.template .template-item .item-detail{color:var(--ql-font-color,#243047);font-size:var(--ql-font-size,14px)}
+.node.template .template-title{font-size:calc(var(--ql-font-size,18px)*1.2)}
+@media(max-width:760px){.styles-panel{top:70px;right:7px;bottom:8px;width:min(310px,calc(100vw - 14px))}.styles-toggle{height:35px;min-width:35px;padding:0 7px}.styles-toggle span{display:none}}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -238,6 +275,7 @@
       <button class="secondary compact" data-action="redo" title="Refazer (Ctrl+Y)" aria-label="Refazer">↷</button>
       <button class="secondary" id="import-file"><span>＋</span> Importar</button>
       <button class="primary" id="export-file">Salvar arquivo</button>
+      <button type="button" class="styles-toggle" id="styles-toggle" aria-controls="styles-panel" aria-expanded="false" title="Cores, pincéis, fonte e fundo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9c0-2-2-3-4-3h-2c-1 0-1-1-1-2 0-2 1-4-2-4Z"/><circle cx="7.5" cy="10" r="1"/><circle cx="11.5" cy="6.9" r="1"/><circle cx="8.5" cy="15.5" r="1"/><circle cx="15" cy="15" r="1"/></svg><span>Estilos</span></button>
       <button type="button" class="lock-toggle" id="board-lock" aria-label="Travar elementos do quadro" aria-pressed="false" title="Travar os elementos, mantendo zoom e movimentação">
         <svg class="lock-icon lock-open" xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-1.8"/></svg>
         <svg class="lock-icon lock-closed" xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 1 1 8 0v4"/></svg>
@@ -296,6 +334,19 @@
     </div>
     <div id="drop-hint">Solte seus arquivos para inserir no quadro</div>
   </main>
+  <aside id="styles-panel" class="styles-panel" hidden aria-label="Estilos do quadro">
+    <div class="styles-heading"><strong>Estilos</strong><button id="styles-close" class="icon-button" type="button" aria-label="Fechar estilos">×</button></div>
+    <div class="style-section"><strong>Paletas de cores</strong><p>Escolha um conjunto de cores para o quadro.</p><div id="palette-options" class="palette-grid"></div><button type="button" id="apply-style-all" class="styles-apply">Aplicar paleta a elementos existentes</button></div>
+    <div class="style-section"><strong>Caneta e pincel</strong><label for="style-pen-color">Cor do pincel</label><div id="style-pen-swatches" class="styles-swatches"></div><div class="style-pair"><input type="color" id="style-pen-color" value="#344f81" aria-label="Escolher cor do pincel"><span id="style-pen-hex">#344F81</span></div>
+      <label for="style-pen-size">Espessura do pincel: <output id="style-pen-size-label">3 px</output></label><input type="range" id="style-pen-size" min="1" max="28" step="1" value="3"><div class="brush-preview"><span id="style-brush-line"></span></div>
+    </div>
+    <div class="style-section"><strong>Post-its e formas</strong><p>Aplica ao elemento selecionado ou define a cor das próximas criações.</p><div id="style-fill-swatches" class="styles-swatches"></div><div class="style-pair"><input type="color" id="style-fill-color" value="#fff1b8" aria-label="Cor de post-it ou forma"><span id="style-fill-hex">#FFF1B8</span></div></div>
+    <div class="style-section"><strong>Fontes</strong><label for="style-font-color">Cor do texto</label><div id="style-font-swatches" class="styles-swatches"></div><div class="style-pair"><input type="color" id="style-font-color" value="#243047" aria-label="Cor da fonte"><span id="style-font-hex">#243047</span></div>
+      <label for="style-font-size">Tamanho da fonte: <output id="style-font-size-label">16 px</output></label><input type="range" min="10" max="72" step="1" value="16" id="style-font-size">
+    </div>
+    <div class="style-section"><strong>Fundo do quadro</strong><div id="style-bg-swatches" class="styles-swatches"></div><div class="style-pair"><input type="color" id="style-bg-color" value="#f6f8fc" aria-label="Cor de fundo do quadro"><span id="style-bg-hex">#F6F8FC</span></div><label class="style-checkbox"><input type="checkbox" id="style-show-grid" checked> Mostrar grade de pontos</label></div>
+    <p class="styles-footnote">As cores do quadro ficam salvas nesta pasta e no backup. Post-its existentes não são alterados ao trocar de paleta, a menos que você peça.</p>
+  </aside>
   <aside id="inspector" class="inspector" hidden>
     <div class="inspector-head"><strong>Propriedades</strong><button id="close-inspector" class="icon-button" aria-label="Fechar">×</button></div>
     <label>Cor do elemento <input type="color" id="node-color" value="#fff1b8"></label>
@@ -311,7 +362,7 @@
   <dialog id="slides-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Apresentação</strong><button type="button" class="icon-button" id="slides-close" aria-label="Fechar apresentação">×</button></div><div class="slide-display"><div id="slide-counter"></div><h2 id="slide-heading"></h2><p id="slide-description"></p></div><div class="slide-controls"><button class="secondary" id="slide-previous">Anterior</button><button class="primary" id="slide-next">Próximo</button></div></div></dialog>
   <dialog id="poll-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Atividade</strong><button type="button" class="icon-button" id="poll-close" aria-label="Fechar atividade">×</button></div><h2 id="poll-question"></h2><div id="poll-options"></div><p class="small-muted">Votação local neste navegador. Não há participação simultânea pela internet.</p></div></dialog>
   <dialog id="welcome-dialog"><div class="dialog-body"><div class="dialog-mark">Q</div><h2>Seu quadro está pronto</h2><p>Crie notas, mova elementos, importe documentos e organize tudo em um espaço infinito.</p><p class="privacy-note"><strong>Privacidade:</strong> nesta versão, o salvamento é feito no navegador deste dispositivo. Para usar o mesmo quadro em outro aparelho, exporte e importe o arquivo do projeto. A sincronização em nuvem ainda não está ativada.</p><button class="primary" id="welcome-close">Começar a criar</button></div></dialog>
-<script>/* Quadro Livre v1.6.0 - editor de quadro infinito, sem servidor e sem rastreamento */
+<script>/* Quadro Livre v1.7.0 - editor de quadro infinito, sem servidor e sem rastreamento */
 (() => {
 'use strict';
 const $ = (q, el=document) => el.querySelector(q);
@@ -321,6 +372,19 @@ const input=$('#file-input'),title=$('#board-title'),status=$('#save-status'),in
 const SAVE_KEY='quadro-livre-board-v1', OPENED_KEY='quadro-livre-welcome';
 let nodes=[], connectors=[], paths=[], arrows=[], selected=null, tool='select', interaction=null, zoom=1, ox=innerWidth*.42, oy=(innerHeight-70)*.43, history=[], future=[], db=null, saveTimer=null, toastTimer=null, spaceHeld=false, locked=false;
 const WORKSPACE_KEY='quadro-livre-workspace-v2';let workspace=null,activeFolderId='root';
+const DEFAULT_STYLE={palette:'classic',canvas:'#f6f8fc',grid:true,pen:'#344f81',penWidth:3,note:'#fff1b8',shape:'#cfe5ff',font:'#243047',fontSize:16};
+let boardStyle={...DEFAULT_STYLE};
+const stylePalettes={
+ classic:{name:'Clássica',colors:['#fff1b8','#cfe5ff','#e4d8ff','#ffd8d8','#d3f4e2'],canvas:'#f6f8fc',font:'#243047',pen:'#344f81'},
+ pastel:{name:'Pastel',colors:['#f6a7c3','#f8ceea','#d5bddf','#e6dbf4','#eed6b9'],canvas:'#fcf7fc',font:'#563f68',pen:'#7657a3'},
+ oceano:{name:'Oceano',colors:['#b5e4e7','#8ecbd4','#a8c9e8','#d6ecf2','#e2eff9'],canvas:'#f2fafb',font:'#25485c',pen:'#247895'},
+ terra:{name:'Terra',colors:['#f4d5af','#d5af90','#c2d9c7','#e8e1cb','#a8b9a9'],canvas:'#f9f7f0',font:'#5b4b41',pen:'#80664d'},
+ alegre:{name:'Vibrante',colors:['#ffbcd6','#ffd44c','#99dce8','#bd9cff','#98e0ad'],canvas:'#fcfbf6',font:'#28344b',pen:'#6654b7'},
+ escuro:{name:'Escura',colors:['#5060ab','#ae669e','#6ba4b0','#788c70','#d6a766'],canvas:'#e9eaf2',font:'#20263c',pen:'#5560a6'},
+ cinza:{name:'Neutros',colors:['#e6e4df','#c2d0cf','#adbbc4','#e0d9cd','#b3a89e'],canvas:'#f3f4f5',font:'#3d4851',pen:'#60737b'},
+ cor:{name:'Criativa',colors:['#bba7ff','#ffa2cc','#9be4f0','#ffe0a2','#9de0b5'],canvas:'#f6f5ff',font:'#4c376d',pen:'#704bd3'}
+};
+function normalizedBoardStyle(data){const v={...DEFAULT_STYLE,...(data&&typeof data==='object'?data:{})};for(const k of ['canvas','pen','note','shape','font'])if(!/^#[0-9a-f]{6}$/i.test(v[k]))v[k]=DEFAULT_STYLE[k];v.penWidth=Math.max(1,Math.min(28,Number(v.penWidth)||3));v.fontSize=Math.max(10,Math.min(72,Number(v.fontSize)||16));v.grid=v.grid!==false;return v;}
 const activeTouches=new Map();let pinch=null,touchGestureConsumed=false;
 const cssColors={note:'#fff1b8',text:'#ffffff',rect:'#cfe5ff',ellipse:'#e4d8ff',file:'#ffffff'};
 let uid=()=>globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)+Date.now();
@@ -354,12 +418,12 @@ function setLocked(value,quiet=false){
 }
 $('#board-lock').addEventListener('click',()=>setLocked(!locked));
 function makeNode(type,x,y,extra={}){let defaults={note:[300,195],text:[370,150],rect:[250,150],ellipse:[210,160],file:[360,280]};let [w,h]=defaults[type]||[270,200];return {id:uid(),type,x:Math.round(x),y:Math.round(y),w,h,color:cssColors[type]||'#ffffff',text:type==='note'?'Escreva sua ideia aqui...':type==='text'?'Título ou anotação':'',...extra}}
-const snapshot=()=>JSON.stringify({nodes,connectors,paths,arrows});
+const snapshot=()=>JSON.stringify({nodes,connectors,paths,arrows,style:boardStyle});
 function checkpoint(){history.push(snapshot());if(history.length>45)history.shift();future=[];updateUndoButtons()}
 function undo(){if(locked||!history.length)return;future.push(snapshot());restoreSnapshot(history.pop());updateUndoButtons()}
 function redo(){if(locked||!future.length)return;history.push(snapshot());restoreSnapshot(future.pop());updateUndoButtons()}
 function updateUndoButtons(){$('[data-action=undo]').disabled=locked||!history.length;$('[data-action=redo]').disabled=locked||!future.length}
-function restoreSnapshot(str){try{let o=JSON.parse(str);nodes=o.nodes||[];connectors=o.connectors||[];paths=o.paths||[];arrows=o.arrows||[];selected=null;render();scheduleSave()}catch(e){toast('Não foi possível restaurar.')}}
+function restoreSnapshot(str){try{let o=JSON.parse(str);nodes=o.nodes||[];connectors=o.connectors||[];paths=o.paths||[];arrows=o.arrows||[];if(o.style)boardStyle=normalizedBoardStyle(o.style);selected=null;applyBoardBackground();render();updateStylePanel();scheduleSave()}catch(e){toast('Não foi possível restaurar.')}}
 function scheduleSave(){status.textContent='Salvando neste navegador…';clearTimeout(saveTimer);saveTimer=setTimeout(save,450)}
 function openDatabase(){return new Promise((resolve,reject)=>{if(!('indexedDB' in globalThis)){resolve(null);return}
  const req=indexedDB.open('quadro-livre-local',2);
@@ -391,8 +455,8 @@ async function displayAttachedImage(n,img){
   img.src=url;img.onload=()=>{URL.revokeObjectURL(url);previewURLs.delete(n.id)}
  }catch(e){console.warn('Prévia indisponível:',e)}
 }
-function emptyBoard(name='Nova pasta'){return{title:name,nodes:[],connectors:[],paths:[],arrows:[],locked:false,camera:{zoom:1,ox:innerWidth*.38,oy:innerHeight*.32}}}
-function captureBoard(){return JSON.parse(JSON.stringify({title:title.value||'Meu quadro',nodes,connectors,paths,arrows,locked,camera:{zoom,ox,oy}}))}
+function emptyBoard(name='Nova pasta'){return{title:name,nodes:[],connectors:[],paths:[],arrows:[],style:{...DEFAULT_STYLE},locked:false,camera:{zoom:1,ox:innerWidth*.38,oy:innerHeight*.32}}}
+function captureBoard(){return JSON.parse(JSON.stringify({title:title.value||'Meu quadro',nodes,connectors,paths,arrows,style:boardStyle,locked,camera:{zoom,ox,oy}}))}
 function snapshotWorkspace(){if(!workspace)workspace={version:2,folders:[],canvases:{root:emptyBoard('Meu primeiro quadro')},activeFolderId:'root'};workspace.canvases[activeFolderId]=captureBoard();workspace.activeFolderId=activeFolderId;return JSON.stringify(workspace)}
 async function save(){const serialized=snapshotWorkspace();try{await idbSet(serialized,WORKSPACE_KEY);status.textContent='Salvo neste dispositivo'}catch(e){status.textContent='Não foi possível salvar';toast('Espaço local insuficiente. Exporte um backup do projeto.')}}
 function openFolder(id){
@@ -400,12 +464,13 @@ function openFolder(id){
  workspace.canvases[activeFolderId]=captureBoard();activeFolderId=id;workspace.activeFolderId=id;
  const data=workspace.canvases[id]||emptyBoard(getFolderName(id));workspace.canvases[id]=data;
  nodes=data.nodes||[];connectors=data.connectors||[];paths=data.paths||[];arrows=data.arrows||[];
+ boardStyle=normalizedBoardStyle(data.style);
  title.value=data.title||getFolderName(id);locked=Boolean(data.locked);
  zoom=Math.max(.2,Math.min(4,data.camera?.zoom||1));
  ox=Number.isFinite(data.camera?.ox)?data.camera.ox:innerWidth*.38;
  oy=Number.isFinite(data.camera?.oy)?data.camera.oy:innerHeight*.32;
  selected=null;history=[];future=[];interaction=null;
- render();updateCamera();setLocked(locked,true);updateUndoButtons();renderFolders();closeFolders();scheduleSave();
+ applyBoardBackground();render();updateCamera();setLocked(locked,true);updateUndoButtons();renderFolders();updateStylePanel();closeFolders();scheduleSave();
 }
 function getFolderName(id){return id==='root'?'Meu quadro principal':(workspace?.folders.find(f=>f.id===id)?.name||'Pasta')}
 function closeFolders(){const el=$('#folders-panel');el.hidden=true;$('#folders-toggle').setAttribute('aria-expanded','false')}
@@ -515,9 +580,10 @@ async function init(){
  activeFolderId=workspace.canvases[workspace.activeFolderId]?workspace.activeFolderId:'root';
  const data=workspace.canvases[activeFolderId]||emptyBoard('Meu primeiro quadro');
  nodes=data.nodes||[];connectors=data.connectors||[];paths=data.paths||[];arrows=data.arrows||[];
+ boardStyle=normalizedBoardStyle(data.style);
  title.value=data.title||'Meu primeiro quadro';locked=Boolean(data.locked);
  if(data.camera){zoom=Math.max(.2,Math.min(4,data.camera.zoom||1));ox=data.camera.ox??0;oy=data.camera.oy??0}
- render();updateCamera();setLocked(locked,true);renderFolders();scheduleSave();
+ applyBoardBackground();render();updateCamera();setLocked(locked,true);renderFolders();updateStylePanel();scheduleSave();
  if(!localStorage.getItem(OPENED_KEY))$('#welcome-dialog').showModal();
 }
 function updateCamera(){world.style.transform=`translate(${ox}px,${oy}px) scale(${zoom})`;grid.style.backgroundSize=`${24*zoom}px ${24*zoom}px`;grid.style.backgroundPosition=`${ox}px ${oy}px`;$('#zoom-reset').textContent=`${Math.round(zoom*100)}%`}
