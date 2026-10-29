@@ -54,6 +54,9 @@
         await ref.set({...meta,members:{}});
       }
       const batch=firestore.batch();
+      const remoteBoards=await ref.collection('boards').get();
+      const keep=new Set(encoded.map(([id])=>id));
+      remoteBoards.forEach(snapshot=>{if(!keep.has(snapshot.id))batch.delete(snapshot.ref)});
       batch.set(ref,meta,{merge:true});
       for(const [id,payload] of encoded)
         batch.set(ref.collection('boards').doc(id),{
