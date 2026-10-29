@@ -369,6 +369,8 @@ function startArrowInteraction(e,a,kind){
  if(e.button&&e.pointerType!=='touch')return;
  e.preventDefault();e.stopPropagation();
  selectNode(a.id);
+ // Captura no quadro, não na linha SVG: mantém o gesto quando a seta é redesenhada.
+ try{viewport.setPointerCapture(e.pointerId)}catch(_){}
  const isTouch=e.pointerType==='touch';
  if(!isTouch)checkpoint();
  interaction={kind,id:a.id,pointerId:e.pointerId,isTouch,checkpointed:!isTouch,
@@ -498,6 +500,7 @@ function pointerUp(e){
  const d=interaction;
  if(d.pointerId!=null&&e.pointerId!==d.pointerId)return;
  interaction=null;viewport.classList.remove('panning');
+ if(viewport.hasPointerCapture?.(e.pointerId))viewport.releasePointerCapture(e.pointerId);
  if(touchGestureConsumed||pinch)return;
  if(d.kind==='pending-create'&&!locked){
   const n=addNode(d.createTool,d.point.x-25,d.point.y-25);
@@ -507,8 +510,8 @@ function pointerUp(e){
  }
  if(d.kind==='pending-link'&&!locked){completeNodeLink(d.id);return}
  if(d.kind==='pending-arrow'&&!locked){
-  checkpoint();arrows.push({id:uid(),x1:d.start.x,y1:d.start.y,x2:d.start.x+160,y2:d.start.y+80,color:'#394c78',width:3});
-  render();setTool('select');scheduleSave();return;
+  checkpoint();const a={id:uid(),x1:d.start.x,y1:d.start.y,x2:d.start.x+160,y2:d.start.y+80,color:'#394c78',width:3};
+  arrows.push(a);render();setTool('select');selectNode(a.id);scheduleSave();return;
  }
  if(d.kind==='arrow-create'){
   const a=arrows.find(x=>x.id===d.id);
