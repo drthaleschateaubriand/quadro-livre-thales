@@ -12,6 +12,7 @@
 - Leitura de um quadro, com limite de dados por resposta.
 - Criar notas e editar notas no Firestore com controle de revisão (evita sobrescrever edições concorrentes).
 - Segurança: autorização avaliada a cada chamada; Firestore REST acessado com token de usuário; não há service account ou chave privada.
+- Prévia visual de quadro **somente leitura** dentro do ChatGPT por MCP Apps: ferramenta `mostrar_quadro` e recurso `ui://quadro-livre/preview-v1.html`. A prévia suporta zoom e arrasto dos cartões; a edição completa permanece no site ou nas ferramentas `criar_nota` e `editar_nota`.
 - Não entrega PDFs anexados em formato binário, porque a sincronização Firebase Storage ainda depende de habilitar Cloud Storage e faturamento.
 
 ## Pré-requisitos de ativação
@@ -76,7 +77,7 @@ Com o plugin conectado, experimente:
 - Limite de aproximadamente 750 kB por pasta/quadro. Para grandes documentos e PDFs é preciso Storage e um pipeline específico.
 - Os tokens OAuth são mantidos no KV pelo provedor; as credenciais Firebase de sessão são protegidas no armazenamento interno do provedor. Verifique sempre o escopo OAuth na autorização; revogue concessões ao desconectar o plugin. Use uma conta exclusiva de teste antes de conectar dados reais.
 - Conteúdo confidencial e documentos médicos identificáveis exigem revisão adicional de privacidade, conformidade e retenção antes de uso.
-- A visualização de um **quadro interativo completo dentro do ChatGPT** é a próxima camada, usando MCP Apps / UI resources; a primeira versão oferece operações de dados, não o canvas visual inteiro.
+- A primeira visualização dentro do ChatGPT é uma **prévia navegável**, não um canvas Miro completo. Ela não oferece drag-and-drop persistente nem edição inline dos objetos; os controles de edição ficam nas ferramentas do conector e no site Quadro Livre.
 
 ## Testes e verificação
 
