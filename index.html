@@ -425,7 +425,7 @@ body.branch-editor-open #inspector{display:none}
   <dialog id="slides-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Apresentação</strong><button type="button" class="icon-button" id="slides-close" aria-label="Fechar apresentação">×</button></div><div class="slide-display"><div id="slide-counter"></div><h2 id="slide-heading"></h2><p id="slide-description"></p></div><div class="slide-controls"><button class="secondary" id="slide-previous">Anterior</button><button class="primary" id="slide-next">Próximo</button></div></div></dialog>
   <dialog id="poll-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Atividade</strong><button type="button" class="icon-button" id="poll-close" aria-label="Fechar atividade">×</button></div><h2 id="poll-question"></h2><div id="poll-options"></div><p class="small-muted">Votação local neste navegador. Não há participação simultânea pela internet.</p></div></dialog>
   <dialog id="welcome-dialog"><div class="dialog-body"><div class="dialog-mark">Q</div><h2>Seu quadro está pronto</h2><p>Crie notas, mova elementos, importe documentos e organize tudo em um espaço infinito.</p><p class="privacy-note"><strong>Privacidade:</strong> nesta versão, o salvamento é feito no navegador deste dispositivo. Para usar o mesmo quadro em outro aparelho, exporte e importe o arquivo do projeto. A sincronização em nuvem ainda não está ativada.</p><button class="primary" id="welcome-close">Começar a criar</button></div></dialog>
-<script>/* Quadro Livre v1.7.0 - editor de quadro infinito, sem servidor e sem rastreamento */
+<script>/* Quadro Livre v1.8.0 - editor de quadro infinito, sem servidor e sem rastreamento */
 (() => {
 'use strict';
 const $ = (q, el=document) => el.querySelector(q);
@@ -594,7 +594,7 @@ function setLocked(value,quiet=false){
  $('#import-file').disabled=locked;
  $('#insert-files').disabled=locked;
  $('#start-note').disabled=locked;
- toolsMenu.disabled=locked;$('#create-menu-toggle').disabled=locked;if(locked)closeCreateMenu();updateStylePanel();
+ toolsMenu.disabled=locked;$('#create-menu-toggle').disabled=locked;if(locked){closeCreateMenu();closeBranchEditor()}updateStylePanel();
  $$('.node').forEach(el=>{el.tabIndex=locked?-1:0;const editor=$('.node-text',el);if(editor){editor.contentEditable=String(!locked);editor.tabIndex=locked?-1:0;}});
  if(locked){if(document.activeElement?.blur)document.activeElement.blur();selectNode(null);setToolsOpen(false);setTool('hand');}
  else {setTool('select');}
@@ -645,6 +645,7 @@ function captureBoard(){return JSON.parse(JSON.stringify({title:title.value||'Me
 function snapshotWorkspace(){if(!workspace)workspace={version:2,folders:[],canvases:{root:emptyBoard('Meu primeiro quadro')},activeFolderId:'root'};workspace.canvases[activeFolderId]=captureBoard();workspace.activeFolderId=activeFolderId;return JSON.stringify(workspace)}
 async function save(){const serialized=snapshotWorkspace();try{await idbSet(serialized,WORKSPACE_KEY);status.textContent='Salvo neste dispositivo'}catch(e){status.textContent='Não foi possível salvar';toast('Espaço local insuficiente. Exporte um backup do projeto.')}}
 function openFolder(id){
+ closeBranchEditor();
  if(!workspace||(id!=='root'&&!workspace.folders.some(x=>x.id===id)))return;
  workspace.canvases[activeFolderId]=captureBoard();activeFolderId=id;workspace.activeFolderId=id;
  const data=workspace.canvases[id]||emptyBoard(getFolderName(id));workspace.canvases[id]=data;
@@ -935,6 +936,143 @@ function specialHeader(n,body,controls){
  body.append(bar)
 }
 function setTemplateSize(n,height){const el=$(`.node[data-id="${n.id}"]`);if(el&&height>n.h){n.h=height;el.style.height=height+'px';scheduleSave()}}
+
+let branchEditorTarget=null;
+function currentBranch(){
+ if(!branchEditorTarget)return null;
+ const n=nodes.find(x=>x.id===branchEditorTarget.nodeId);
+ const item=n?.tree?.find(x=>x.id===branchEditorTarget.itemId);
+ return n&&item?{n,item}:null
+}
+function closeBranchEditor(){
+ branchEditorTarget=null;const panel=$('#branch-editor');if(panel)panel.hidden=true;
+ document.body.classList.remove('branch-editor-open');
+ $$('.tree-card.active-branch').forEach(x=>x.classList.remove('active-branch'))
+}
+function openBranchEditor(nodeId,itemId){
+ if(locked)return toast('Destrave o quadro para editar os subtópicos.');
+ const n=nodes.find(x=>x.id===nodeId),item=n?.tree?.find(x=>x.id===itemId);
+ if(!n||!item)return;
+ selectNode(nodeId);
+ branchEditorTarget={nodeId,itemId};
+ $('#branch-editor').hidden=false;
+ document.body.classList.add('branch-editor-open');
+ closeStylesPanel();setToolsOpen(false);closeFolders();closeCreateMenu();
+ $('#branch-edit-title').value=item.label||'';
+ $('#branch-edit-detail').value=item.detail||'';
+ $('#branch-edit-bg').value=branchColor(item,'bgColor',item.parentId===null?'#3659ad':'#ffffff');
+ $('#branch-edit-fg').value=branchColor(item,'textColor',item.parentId===null?'#ffffff':'#253650');
+ $('#branch-edit-font-size').value=branchFontSize(item);
+ $('#branch-edit-size-out').textContent=branchFontSize(item)+' px';
+ $('#branch-edit-width').value=branchWidth(item);
+ $('#branch-edit-width-out').textContent=branchWidth(item)+' px';
+ refreshBranchExtras();
+ $$('.tree-card').forEach(el=>el.classList.toggle('active-branch',el.dataset.branchId===itemId))
+}
+function branchColor(item,key,fallback){return isValidHex(item?.[key])?item[key]:fallback}
+function branchFontSize(item){return Math.max(10,Math.min(26,Number(item?.fontSize)||14))}
+function branchWidth(item){return Math.max(200,Math.min(360,Number(item?.cardWidth)||(item?.parentId===null?250:245)))}
+function treeCardElement(itemId){return $$('.tree-card').find(el=>el.dataset.branchId===itemId)}
+function changeBranchValue(key,value,{rerender=false}={}){
+ const ref=currentBranch();if(!ref||locked)return;
+ const {n,item}=ref;
+ item[key]=value;
+ const card=treeCardElement(item.id);
+ if(card){
+  if(key==='label'){$('.branch-label',card).textContent=value}
+  if(key==='detail'){$('.branch-detail',card).textContent=value}
+  if(key==='bgColor')card.style.background=value;
+  if(key==='textColor')card.style.color=value;
+  if(key==='fontSize')card.style.setProperty('--branch-size',value+'px');
+  if(key==='cardWidth')card.style.width=value+'px';
+ }
+ if(rerender){const target=branchEditorTarget;render();if(target){$$('.tree-card').forEach(el=>el.classList.toggle('active-branch',el.dataset.branchId===target.itemId))}}
+ scheduleSave();
+}
+function branchEditableInput(id,key,convert=x=>x){
+ const field=$('#'+id);let original=null;
+ field.addEventListener('focus',()=>{if(!locked&&currentBranch())original=snapshot()});
+ field.addEventListener('input',()=>{
+  if(locked)return;
+  const value=convert(field.value);changeBranchValue(key,value);
+  if(key==='fontSize')$('#branch-edit-size-out').textContent=value+' px';
+  if(key==='cardWidth')$('#branch-edit-width-out').textContent=value+' px';
+ });
+ field.addEventListener('blur',()=>{
+  if(original&&original!==snapshot()){history.push(original);if(history.length>45)history.shift();future=[];updateUndoButtons();
+   const ref=currentBranch();if(ref){render();$$('.tree-card').forEach(el=>el.classList.toggle('active-branch',el.dataset.branchId===ref.item.id))}}
+  original=null;
+ });
+}
+branchEditableInput('branch-edit-title','label');
+branchEditableInput('branch-edit-detail','detail');
+branchEditableInput('branch-edit-bg','bgColor');
+branchEditableInput('branch-edit-fg','textColor');
+branchEditableInput('branch-edit-font-size','fontSize',v=>Math.max(10,Math.min(26,Number(v)||14)));
+branchEditableInput('branch-edit-width','cardWidth',v=>Math.max(200,Math.min(360,Number(v)||245)));
+$('#branch-editor-close').onclick=closeBranchEditor;
+function refreshBranchExtras(){
+ const target=currentBranch(),wrap=$('#branch-extra-list');wrap.replaceChildren();
+ if(!target)return;
+ const {n,item}=target;item.blocks=Array.isArray(item.blocks)?item.blocks:[];
+ for(const block of item.blocks){
+  const row=document.createElement('div');row.className='branch-extra-item';
+  const header=document.createElement('header'),text=document.createElement('strong');
+  text.textContent=block.type==='text'?'Anotação':block.type==='link'?'Hiperlink':block.mime?.startsWith('image/')?'Imagem':'Anexo';
+  const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Remover este conteúdo do subtópico';
+  remove.onclick=()=>{if(locked)return;checkpoint();item.blocks=item.blocks.filter(x=>x.id!==block.id);render();refreshBranchExtras();scheduleSave()};
+  header.append(text,remove);row.append(header);
+  if(block.type==='text'||block.type==='link'){
+   const fields=block.type==='text'?[['text','Escreva o conteúdo adicional...','textarea']]:[['label','Nome do link','input'],['url','https://exemplo.com','input']];
+   for(const [key,hint,type] of fields){
+    const input=document.createElement(type);if(type==='input')input.type='text';
+    input.placeholder=hint;input.value=String(block[key]||'');if(type==='textarea')input.rows=3;
+    let original=null;
+    input.addEventListener('focus',()=>{original=snapshot()});
+    input.addEventListener('input',()=>{block[key]=input.value;scheduleSave()});
+    input.addEventListener('blur',()=>{if(original&&original!==snapshot()){history.push(original);future=[];updateUndoButtons();render()}original=null});
+    row.append(input)
+   }
+   if(block.type==='link'){
+    const open=document.createElement('button');open.textContent='Abrir link';open.onclick=()=>openSafeLink(block.url);
+    row.append(open)
+   }
+  }else if(block.type==='file'){
+   const name=document.createElement('span');name.textContent=block.name||'Arquivo';name.style.fontSize='12px';row.append(name);
+   const dl=document.createElement('button');dl.textContent='Abrir / baixar';dl.onclick=()=>downloadAttachment(block);row.append(dl)
+  }
+  wrap.append(row)
+ }
+}
+$('#branch-add-note').onclick=()=>{
+ const ref=currentBranch();if(!ref||locked)return;
+ checkpoint();ref.item.blocks=Array.isArray(ref.item.blocks)?ref.item.blocks:[];
+ ref.item.blocks.push({id:uid(),type:'text',text:'Escreva outra informação aqui...'});
+ render();refreshBranchExtras();scheduleSave()
+};
+$('#branch-add-link').onclick=()=>{
+ const ref=currentBranch();if(!ref||locked)return;
+ checkpoint();ref.item.blocks=Array.isArray(ref.item.blocks)?ref.item.blocks:[];
+ ref.item.blocks.push({id:uid(),type:'link',label:'Novo link',url:''});
+ render();refreshBranchExtras();scheduleSave()
+};
+$('#branch-add-file').onclick=()=>{if(!locked&&currentBranch())$('#branch-file-picker').click()};
+$('#branch-file-picker').addEventListener('change',async e=>{
+ const ref=currentBranch();if(!ref||locked)return;
+ const nodeId=ref.n.id,itemId=ref.item.id,files=[...e.target.files];e.target.value='';
+ for(const file of files){
+  const attachmentId=uid();
+  try{
+   await storeAttachment(attachmentId,file);
+   const n=nodes.find(x=>x.id===nodeId),item=n?.tree?.find(x=>x.id===itemId);
+   if(!item)continue;
+   checkpoint();item.blocks=Array.isArray(item.blocks)?item.blocks:[];
+   item.blocks.push({id:uid(),type:'file',name:file.name,mime:file.type||'application/octet-stream',size:file.size,attachmentId});
+   render();refreshBranchExtras();scheduleSave();
+  }catch(err){console.error('Falha no anexo:',err);toast('Não foi possível guardar '+file.name+'. Verifique o espaço do navegador.')}
+ }
+});
+
 function renderTreeTemplate(el,n){
  const body=document.createElement('div');body.className='template-body special-template';
  if(!Array.isArray(n.tree)||!n.tree.length){const id=uid();n.tree=[{id,parentId:null,label:n.kind==='orgchart'?'Direção':'Tema central',detail:'',side:'right'}]}
@@ -1446,7 +1584,7 @@ async function exportProject(){
  }
  try{
   const zip=new JSZip();zip.file('workspace.json',JSON.stringify(project,null,2));
-  const ids=new Set(Object.values(project.canvases||{}).flatMap(board=>(board.nodes||[]).map(n=>n.attachmentId).filter(Boolean)));
+  const ids=new Set(Object.values(project.canvases||{}).flatMap(board=>(board.nodes||[]).flatMap(n=>[n.attachmentId,...(n.tree||[]).flatMap(item=>(item.blocks||[]).map(block=>block.attachmentId))]).filter(Boolean)));
   let missing=0;
   for(const id of ids){
    const attachment=await getAttachment(id);
@@ -1466,7 +1604,7 @@ async function importZipBackup(file){
  if(data.application!=='Quadro Livre'||!data.canvases||!Array.isArray(data.folders))throw Error('Backup de quadro inválido');
  if(!confirm('Restaurar pastas e quadros do ZIP? O quadro atual será substituído.'))return;
  if(!db)throw Error('Armazenamento do navegador indisponível');
- const allowedIds=new Set(Object.values(data.canvases).flatMap(board=>(board.nodes||[]).map(n=>n.attachmentId).filter(Boolean)));
+ const allowedIds=new Set(Object.values(data.canvases).flatMap(board=>(board.nodes||[]).flatMap(n=>[n.attachmentId,...(n.tree||[]).flatMap(item=>(item.blocks||[]).map(block=>block.attachmentId))]).filter(Boolean)));
  for(const id of allowedIds){if(!/^[a-zA-Z0-9_-]{1,100}$/.test(id))continue;
   const entry=zip.file('anexos/'+id);if(!entry)continue;
   const blob=await entry.async('blob');await storeAttachment(id,blob);
