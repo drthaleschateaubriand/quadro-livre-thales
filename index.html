@@ -111,6 +111,20 @@
 #poll-options button:hover{background:#e8efff}
 .small-muted{font-size:11px;color:#7b8aa1;line-height:1.5}
 @media(max-width:760px){.slide-display{padding:18px;min-height:260px}.experience-body{padding:14px}}
+
+@media(max-width:600px){
+ .topbar{padding:0 5px;gap:4px}
+ .brand{display:none}
+ .docinfo{max-width:90px}
+ .docinfo input{font-size:12px;min-width:50px}
+ .top-actions{gap:3px}
+ .top-actions #import-file{width:34px;min-width:34px;padding:0;font-size:0}
+ .top-actions #import-file span{font-size:19px!important}
+ .top-actions #export-file{width:35px;min-width:35px;padding:0;font-size:0}
+ .top-actions #export-file::before{content:"⇩";font-size:21px}
+ .top-actions #board-lock{width:35px;min-width:35px}
+ .folders-toggle,.creation-trigger,#tool-menu{min-width:32px;width:34px;padding:0 5px}
+}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -510,6 +524,9 @@ function closeCreateMenu(){$('#creation-menu').hidden=true;$('#create-menu-toggl
 function toggleCreateMenu(){const pane=$('#creation-menu');if(locked){toast('Destrave o quadro para inserir.');return}if(!pane.hidden){closeCreateMenu();return}closeFolders();setToolsOpen(false);pane.hidden=false;$('#create-menu-toggle').setAttribute('aria-expanded','true')}
 $('#create-menu-toggle').addEventListener('click',toggleCreateMenu);
 $('#creation-close').addEventListener('click',closeCreateMenu);
+document.addEventListener('pointerdown',e=>{const panel=$('#creation-menu'),button=$('#create-menu-toggle');
+ if(!panel.hidden&&!panel.contains(e.target)&&!button.contains(e.target))closeCreateMenu();
+});
 $$('[data-template]').forEach(button=>button.addEventListener('click',()=>{
  const kind=button.dataset.template;if(kind==='url'){addWebLink();return}
  if(locked)return toast('Destrave o quadro.');
@@ -792,17 +809,17 @@ async function importZipBackup(file){
  }
  const textFile=new File([JSON.stringify(data)],'backup.quadro.json',{type:'application/json'});
  // Aproveita o importador de quadros com validação de versão.
- await importProject(textFile);
+ await importProject(textFile,true);
 }
 function readAsDataURL(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(file)})}
 function readAsText(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsText(file)})}
 function readAsBuffer(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsArrayBuffer(file)})}
-async function importProject(file){
+async function importProject(file,skipConfirmation=false){
  if(locked)return;
  const o=JSON.parse(await readAsText(file));
  if(o.application!=='Quadro Livre')throw Error('Arquivo inválido');
  if(o.version===2&&o.canvases&&Array.isArray(o.folders)){
-  if(!confirm('Substituir todas as pastas e quadros atuais pelo backup importado?'))return;
+  if(!skipConfirmation&&!confirm('Substituir todas as pastas e quadros atuais pelo backup importado?'))return;
   workspace=o;activeFolderId='root';workspace.activeFolderId='root';
   const root=workspace.canvases.root||emptyBoard('Meu quadro principal');
   nodes=root.nodes||[];connectors=root.connectors||[];paths=root.paths||[];arrows=root.arrows||[];
