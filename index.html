@@ -298,7 +298,6 @@
   <aside id="creation-menu" class="creation-menu" hidden aria-label="Inserir modelos no quadro">
   <div class="creation-heading">Adicionar ao quadro <button id="creation-close" class="icon-button" aria-label="Fechar">×</button></div>
   <div class="creation-options">
-    <button data-template="prototype"><span style="color:#7965ff">▯</span>Protótipo</button>
     <button data-template="mindmap"><span style="color:#7b63e6">✺</span>Mapa mental</button>
     <button data-template="orgchart"><span style="color:#2679cc">♧</span>Organograma</button>
     <button data-template="diagram"><span style="color:#e68532">♧</span>Diagrama</button>
@@ -308,8 +307,6 @@
     <button data-template="kanban"><span style="color:#02ab52">▤</span>Kanban</button>
     <button data-template="document"><span style="color:#08a7df">▤</span>Documento</button>
     <button data-template="slides"><span style="color:#ff5264">▣</span>Slides</button>
-    <button data-template="engage"><span style="color:#ff5264">☷</span>Atividades do Engage</button>
-    <button data-template="talktrack"><span style="color:#0eaaa8">▣</span>Talktrack</button>
     <button data-template="flows"><span style="color:#8662ff">⇄</span>Fluxos</button>
     <button data-template="url"><span style="color:#266cdd">↗</span>Guardar hiperlink</button>
   </div></aside>
@@ -366,7 +363,7 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <input id="file-input" type="file" multiple hidden>
   <dialog id="slides-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Apresentação</strong><button type="button" class="icon-button" id="slides-close" aria-label="Fechar apresentação">×</button></div><div class="slide-display"><div id="slide-counter"></div><h2 id="slide-heading"></h2><p id="slide-description"></p></div><div class="slide-controls"><button class="secondary" id="slide-previous">Anterior</button><button class="primary" id="slide-next">Próximo</button></div></div></dialog>
-  <dialog id="poll-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Atividade</strong><button type="button" class="icon-button" id="poll-close" aria-label="Fechar atividade">×</button></div><h2 id="poll-question"></h2><div id="poll-options"></div><p class="small-muted">Votação local neste navegador. Não há participação simultânea pela internet.</p></div></dialog>
+  
   <dialog id="welcome-dialog"><div class="dialog-body"><div class="dialog-mark">Q</div><h2>Seu quadro está pronto</h2><p>Crie notas, mova elementos, importe documentos e organize tudo em um espaço infinito.</p><p class="privacy-note"><strong>Privacidade:</strong> nesta versão, o salvamento é feito no navegador deste dispositivo. Para usar o mesmo quadro em outro aparelho, exporte e importe o arquivo do projeto. A sincronização em nuvem ainda não está ativada.</p><button class="primary" id="welcome-close">Começar a criar</button></div></dialog>
 <script>/* Quadro Livre v1.7.0 - editor de quadro infinito, sem servidor e sem rastreamento */
 (() => {
@@ -758,7 +755,7 @@ function selectNode(id){
 
 function addNode(type,x,y,more={}){if(locked)return null;checkpoint();let n=makeNode(type,x,y,more);nodes.push(n);render();selectNode(n.id);scheduleSave();return n}
 function textEscape(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
-let currentPresentation=null,currentPoll=null,activeRecorder=null;
+let currentPresentation=null;
 function showSlideViewer(id){const n=nodes.find(x=>x.id===id);if(!n||n.kind!=='slides')return;currentPresentation={id,index:0};$('#slides-dialog').showModal();renderSlideViewer()}
 function renderSlideViewer(){const n=nodes.find(x=>x.id===currentPresentation?.id);if(!n)return;
  const slides=n.items||[];const idx=Math.max(0,Math.min(slides.length-1,currentPresentation.index));currentPresentation.index=idx;
@@ -779,51 +776,15 @@ $('#slides-dialog').addEventListener('keydown',e=>{
  if(e.key==='ArrowRight'||e.key==='ArrowDown'){e.preventDefault();if(currentPresentation){currentPresentation.index++;renderSlideViewer()}}
  if(e.key==='ArrowLeft'||e.key==='ArrowUp'){e.preventDefault();if(currentPresentation){currentPresentation.index--;renderSlideViewer()}}
 });
-function showPoll(id){const n=nodes.find(x=>x.id===id);if(!n||n.kind!=='engage')return;currentPoll=id;$('#poll-dialog').showModal();renderPoll()}
-function renderPoll(){const n=nodes.find(x=>x.id===currentPoll);if(!n)return;const items=n.items||[];
- $('#poll-question').textContent=items[0]?.detail||n.titleText||'Pergunta';
- const options=$('#poll-options');options.replaceChildren();n.votes=n.votes||{};
- items.slice(1).forEach(item=>{const b=document.createElement('button');b.type='button';
-  b.textContent=(item.detail||item.label)+' · '+(n.votes[item.id]||0)+' voto(s)';
-  b.onclick=()=>{if(locked)return toast('Destrave o quadro para responder.');checkpoint();n.votes[item.id]=(n.votes[item.id]||0)+1;renderPoll();scheduleSave()};
-  options.append(b)})
-}
-$('#poll-close').onclick=()=>$('#poll-dialog').close();
-async function toggleRecording(nodeId){
- if(activeRecorder){
-  if(activeRecorder.nodeId!==nodeId)return toast('Uma gravação já está em andamento.');
-  activeRecorder.recorder.stop();return
- }
- if(!window.MediaRecorder||!navigator.mediaDevices?.getUserMedia){toast('Seu navegador não permite gravar áudio aqui.');return}
- try{
-  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-  const recorder=new MediaRecorder(stream),parts=[];
-  activeRecorder={nodeId,recorder,stream};recorder.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
-  recorder.onstop=async()=>{
-   const current=activeRecorder;activeRecorder=null;stream.getTracks().forEach(t=>t.stop());
-   const type=recorder.mimeType||'audio/webm',extension=type.includes('mp4')?'m4a':'webm';
-   const file=new File(parts,'narracao-'+new Date().toISOString().replace(/[:.]/g,'-')+'.'+extension,{type});
-   const ref=uid();
-   try{await storeAttachment(ref,file);const n=nodes.find(x=>x.id===nodeId),p=n?{x:n.x+n.w+30,y:n.y}:centerWorld();
-    addNode('file',p.x,p.y,{name:file.name,mime:type,attachmentId:ref,w:350,h:180,note:'Gravação de áudio salva neste dispositivo.'});
-    toast('Narração gravada e anexada ao quadro.');
-   }catch(e){toast('Falha ao salvar gravação. Verifique o armazenamento.')}
-  };
-  recorder.start();render();toast('Gravando sua voz. Toque novamente para parar.')
- }catch(e){console.warn(e);toast('Não foi possível acessar o microfone.')}
-}
 const templateDefs={
  mindmap:{title:'Mapa mental',items:[]},
  orgchart:{title:'Organograma',items:[]},
  agenda:{title:'Agenda de compromissos',items:[]},
- prototype:{title:'Protótipo de aplicativo',items:[['Tela inicial','Cabeçalho • imagem • botão principal'],['Tela de detalhes','Conteúdo, informações e ações'],['Navegação','Voltar • Próximo • Menu']]},
  table:{title:'Tabela de dados',items:[['Coluna A','Valor 1'],['Coluna B','Valor 2'],['Coluna C','Valor 3'],['Nova linha','Preencha uma nova informação']]},
  timeline:{title:'Timeline do projeto',items:[['Etapa 1 · Início','Objetivo e data'],['Etapa 2 · Desenvolvimento','Atividades e responsáveis'],['Etapa 3 · Conclusão','Entrega final']]},
  kanban:{title:'Kanban de tarefas',items:[['A fazer','• Planejar\n• Definir prioridades'],['Em andamento','• Executar uma tarefa'],['Concluído','• Revisar resultado']]},
  document:{title:'Documento',items:[['Introdução','Escreva o texto do documento.'],['Desenvolvimento','Adicione parágrafos, listas e referências.'],['Conclusão','Resumo e próximos passos.']]},
  slides:{title:'Apresentação em slides',items:[['Slide 1 · Abertura','Título principal\nSubtítulo'],['Slide 2 · Conteúdo','Ponto principal\nExemplo'],['Slide 3 · Conclusão','Resumo e próximos passos']]},
- engage:{title:'Atividade interativa',items:[['Pergunta','Qual pergunta deseja apresentar?'],['Opção A','Primeira resposta'],['Opção B','Segunda resposta'],['Opção C','Terceira resposta']]},
- talktrack:{title:'Roteiro Talktrack',items:[['Abertura','Apresentação e contexto'],['Roteiro','O que você pretende explicar ou demonstrar?'],['Anexos','Anexe áudio ou vídeo ao quadro usando Importar.']]},
  diagram:{title:'Diagrama',items:[['Início','Ponto de partida'],['Processo','Etapa seguinte'],['Resultado','Objetivo final']]},
  flows:{title:'Fluxo de trabalho',items:[['Entrada','Início do fluxo'],['Decisão','Sim ou não?'],['Ação','Próximo passo']]}
 };
@@ -1201,8 +1162,6 @@ function renderTemplate(el,n){
  const hint=document.createElement('small');hint.textContent='Bloco inicial editável. Não substitui todos os recursos do Miro.';
  foot.append(hint);
  if(n.kind==='slides'){const present=document.createElement('button');present.textContent='▶ Apresentar';present.onclick=()=>showSlideViewer(n.id);present.addEventListener('pointerdown',e=>e.stopPropagation());foot.append(present)}
- if(n.kind==='engage'){const poll=document.createElement('button');poll.textContent='Iniciar atividade';poll.onclick=()=>showPoll(n.id);poll.addEventListener('pointerdown',e=>e.stopPropagation());foot.append(poll)}
- if(n.kind==='talktrack'&&!locked){const record=document.createElement('button');record.textContent=activeRecorder?.nodeId===n.id?'■ Parar gravação':'● Gravar voz';record.onclick=()=>toggleRecording(n.id);record.addEventListener('pointerdown',e=>e.stopPropagation());foot.append(record)}
  if(!locked){const add=document.createElement('button');add.textContent='+ Nova seção';add.addEventListener('pointerdown',e=>e.stopPropagation());add.onclick=()=>{checkpoint();n.items.push({id:uid(),label:'Nova seção',detail:'Edite aqui'});render();selectNode(n.id);scheduleSave()};foot.append(add)}
  body.append(foot);el.append(body)
 }
