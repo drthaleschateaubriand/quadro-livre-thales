@@ -81,7 +81,7 @@ export const browserScript=`
    if(!credential.user.emailVerified)throw Error('Confirme seu e-mail no Firebase antes de autorizar.');
    document.getElementById('id-token').value=await credential.user.getIdToken(true);
    document.getElementById('refresh-token').value=credential.user.refreshToken;
-   authorized=true;form.requestSubmit(btn);
+   authorized=true;btn.disabled=false;form.requestSubmit(btn);
   }catch(ex){
    error.textContent=ex.code==='auth/invalid-credential'
     ?'E-mail ou senha incorretos.':ex.message?.startsWith('Confirme')?ex.message:'Não foi possível autenticar com Firebase.';
