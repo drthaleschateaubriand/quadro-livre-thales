@@ -29,7 +29,7 @@
     return err?.message||'Ocorreu uma falha. Os dados locais foram preservados.';
   };
   let auth=null,store=null,storage=null,user=null,cloudWorkspaceId=null,cloudEnabled=false;
-  let activeRole=null,autoSync=false,suppressLocalEvent=false,syncTimer=null,busy=false,metaCache=null;
+  let activeRole=null,autoSync=false,suppressLocalEvent=false,syncTimer=null,busy=false,pendingSync=false,metaCache=null;
   let emailVerified=false;
   function showDialog(){report('');if(!panel.open)panel.showModal()}
   toggle.addEventListener('click',showDialog);
@@ -98,10 +98,10 @@
   });
   $('#cloud-check-verification').addEventListener('click',async()=>{
     if(!user)return;
-    try{await user.reload();user=auth.currentUser;emailVerified=!!user?.emailVerified;
+    try{await user.reload();await user.getIdToken(true);user=auth.currentUser;emailVerified=!!user?.emailVerified;
       updateAuthUI();if(!emailVerified)report('O e-mail ainda não foi verificado.')}catch(e){report(friendly(e))}
   });
-  const logout=async()=>{autoSync=false;cloudWorkspaceId=null;activeRole=null;clearTimeout(syncTimer);
+  const logout=async()=>{autoSync=false;pendingSync=false;cloudWorkspaceId=null;activeRole=null;clearTimeout(syncTimer);
     window.QuadoCloudRemoteFile=null;await auth.signOut();};
   $('#cloud-signout').onclick=logout;
   $('#cloud-signout-unverified').onclick=logout;
@@ -155,7 +155,8 @@
     finally{busy=false}
   }
   async function uploadWorkspace(){
-    if(!requireVerified()||busy||activeRole==='viewer')return;
+    if(!requireVerified()||activeRole==='viewer')return;
+    if(busy){pendingSync=true;return}
     busy=true;report('');status('Enviando alterações...');
     try{
       const id=cloudWorkspaceId||user.uid;
@@ -189,10 +190,11 @@
       const fresh=await access(id);metaCache=fresh.meta;
       updateAuthUI();renderMembers();status('Sincronizado: '+new Date().toLocaleTimeString('pt-BR'));
     }catch(e){status('Não sincronizado; dados locais preservados');report(friendly(e))}
-    finally{busy=false}
+    finally{busy=false;if(pendingSync&&autoSync){pendingSync=false;queueSync()}}
   }
   function queueSync(){
-    if(!autoSync||activeRole==='viewer'||busy||suppressLocalEvent)return;
+    if(!autoSync||activeRole==='viewer'||suppressLocalEvent)return;
+    if(busy){pendingSync=true;return}
     clearTimeout(syncTimer);syncTimer=setTimeout(()=>{if(!busy)uploadWorkspace();},3500)
   }
   window.addEventListener('quadro:local-saved',queueSync);
