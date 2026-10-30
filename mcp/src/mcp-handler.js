@@ -1,6 +1,6 @@
 import {
   refreshFirebaseToken, getWorkspaceMeta, readBoard, listBoards,
-  saveBoard, makeNote, summarizeBoard, searchBoard
+  saveBoard, makeNote, makeDocument, summarizeBoard, searchBoard
 } from './firestore.js';
 import { BOARD_RESOURCE_URI, BOARD_WIDGET_HTML } from './board-widget.js';
 
@@ -35,6 +35,11 @@ const TOOLS=[
    {termo:{...STRING,minLength:1,maxLength:160}},['termo']),
  tool('listar_documentos','Lista documentos anexados aos quadros (nome/tipo), sem revelar conteúdo dos PDFs.',
    {}),
+ tool('criar_documento','Cria um documento textual organizado no quadro salvo, preservando título, subtítulos e conteúdo.',
+   {quadro_id:BOARD_ID,titulo:{...STRING,minLength:1,maxLength:240},conteudo:{...STRING,minLength:1,maxLength:60000},
+    x:{type:'number',description:'Posição horizontal opcional no quadro'},
+    y:{type:'number',description:'Posição vertical opcional no quadro'}},
+   ['quadro_id','titulo','conteudo'],true),
  tool('criar_nota','Cria nota adesiva num quadro salvo. Modifica somente o quadro do usuário autenticado.',
    {quadro_id:BOARD_ID,texto:{...STRING,minLength:1,maxLength:12000},
     x:{type:'number',description:'Posição horizontal opcional no quadro'},
@@ -110,6 +115,16 @@ async function performTool(name,args,env,props) {
     }
     return {documentos:found,aviso:'O conector lista metadados. PDFs, imagens e áudios precisam estar sincronizados no Cloud Storage para leitura remota.'};
   }
+  if(name==='criar_documento'){
+    paramsOK(args,['quadro_id','titulo','conteudo'],['quadro_id','titulo','conteudo','x','y']);
+    const b=await readBoard(env,uid,idToken,args.quadro_id);
+    if(b.data.nodes.length>=2000)throw Error('Limite de objetos no quadro atingido.');
+    const document=makeDocument(args.titulo,args.conteudo,args.x,args.y);
+    b.data.nodes.push(document);
+    await saveBoard(env,uid,idToken,b.id,b.data,b.updateTime);
+    return {criado:true,tipo:'documento',quadro_id:b.id,documento_id:document.id,
+      titulo:document.documentTitle,mensagem:'Documento salvo no Firestore e disponível no Quadro Livre.'};
+  }
   if(name==='criar_nota'){
     paramsOK(args,['quadro_id','texto'],['quadro_id','texto','x','y']);
     if(typeof args.texto!=='string'||args.texto.length>12000)throw Error('Nota inválida.');
@@ -163,7 +178,7 @@ async function mcpHandler(request,env,context,makeInsufficientScope) {
   if(msg.method==='tools/call'){
     const name=msg.params?.name,args=msg.params?.arguments||{};
     if(!TOOLS.some(x=>x.name===name))return json({jsonrpc:'2.0',id:msg.id??null,error:{code:-32601,message:'Ferramenta desconhecida.'}});
-    const isWrite=['criar_nota','editar_nota'].includes(name);
+    const isWrite=['criar_documento','criar_nota','editar_nota'].includes(name);
     const needed=isWrite?['mcp:read','mcp:write']:['mcp:read'];
     if(!needed.every(scope=>context.auth.scope.includes(scope)))return makeInsufficientScope(context.auth,needed);
     try{
