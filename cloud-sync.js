@@ -116,10 +116,62 @@
       if(shared&&/^[A-Za-z0-9_-]{5,128}$/.test(shared)){
         $('#cloud-share-workspace').value=shared;
         status('Convite detectado. Use “Abrir quadro compartilhado” para continuar.')
-      }
+      }else autoConnect();
     }
   });
   function workspaceRef(id){return store.collection('workspaces').doc(id)}
+  // Mescla na cópia local objetos criados fora deste aparelho (ex.: ChatGPT/MCP) sem apagar nada local.
+  const syncedKey=id=>'quadro-cloud-synced-ids:'+id;
+  function loadSynced(id){try{return new Set(JSON.parse(localStorage.getItem(syncedKey(id))||'[]'))}catch{return new Set()}}
+  function saveSynced(id,workspace){
+    const ids=Object.values(workspace.canvases||{}).flatMap(b=>(b.nodes||[]).map(n=>n&&n.id)).filter(Boolean);
+    try{localStorage.setItem(syncedKey(id),JSON.stringify(ids))}catch{}
+  }
+  async function fetchCloudBoards(id){
+    const all=await workspaceRef(id).collection('boards').get();const canvases={};
+    all.forEach(doc=>{try{const b=JSON.parse(doc.data().payload||'null');if(b&&typeof b==='object')canvases[doc.id]=b}catch{}});
+    return canvases;
+  }
+  async function mergeRemote(id,info){
+    if(!info?.exists||!info.role)return 0;
+    const cloud=await fetchCloudBoards(id),local=host.getWorkspace(),synced=loadSynced(id);
+    local.canvases=local.canvases||{};let added=0;
+    for(const [key,board] of Object.entries(cloud)){
+      const mine=local.canvases[key];
+      if(!mine){local.canvases[key]=board;added+=(board.nodes||[]).length||1;
+        if(Array.isArray(info.meta?.folders)&&Array.isArray(local.folders)){const f=info.meta.folders.find(x=>x&&x.id===key);if(f&&!local.folders.some(x=>x&&x.id===key))local.folders.push(f)}
+        continue}
+      mine.nodes=Array.isArray(mine.nodes)?mine.nodes:[];
+      const have=new Set(mine.nodes.map(n=>n&&n.id));
+      for(const n of board.nodes||[]){if(n&&n.id&&!have.has(n.id)&&!synced.has(n.id)){mine.nodes.push(n);added++}}
+    }
+    if(added){suppressLocalEvent=true;try{await host.replaceWorkspace(local)}finally{suppressLocalEvent=false}
+      host.toast?.(added===1?'1 item novo da nuvem adicionado ao quadro.':added+' itens novos da nuvem adicionados ao quadro.')}
+    return added;
+  }
+  async function autoConnect(){
+    if(!user||!emailVerified||busy||cloudWorkspaceId)return;
+    busy=true;
+    try{
+      const info=await access(user.uid);
+      if(!info.exists||!info.role)return;
+      await mergeRemote(user.uid,info);
+      cloudWorkspaceId=user.uid;activeRole=info.role;metaCache=info.meta;autoSync=true;
+      window.QuadoCloudRemoteFile=async attachmentId=>downloadRemoteAttachment(attachmentId);
+      updateAuthUI();renderMembers();status('Sincronização ativada · itens da nuvem mesclados');
+    }catch(e){report(friendly(e))}
+    finally{busy=false}
+    queueSync();
+  }
+  async function pullRemote(){
+    if(!user||!emailVerified||busy||!cloudWorkspaceId)return;
+    busy=true;
+    try{const info=await access(cloudWorkspaceId);if(await mergeRemote(cloudWorkspaceId,info))pendingSync=true}
+    catch(e){console.warn('pull',e)}
+    finally{busy=false;if(pendingSync&&autoSync){pendingSync=false;queueSync()}}
+  }
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')cloudWorkspaceId?pullRemote():autoConnect()});
+  setInterval(()=>{if(document.visibilityState==='visible')pullRemote()},60000);
   async function access(id){
     const snapshot=await workspaceRef(id).get();
     if(!snapshot.exists)return {exists:false,role:id===user.uid?'owner':null,meta:null};
@@ -145,7 +197,7 @@
         canvases,activeFolderId:canvases[info.meta.activeFolderId]?info.meta.activeFolderId:'root'};
       if(!confirm('Carregar este quadro da nuvem no dispositivo? Seus quadros locais serão substituídos nesta sessão. Faça backup ZIP antes de continuar.'))return;
       // Não envia conteúdo local por acidente durante a restauração.
-      suppressLocalEvent=true;await host.replaceWorkspace(next);suppressLocalEvent=false;
+      suppressLocalEvent=true;await host.replaceWorkspace(next);suppressLocalEvent=false;saveSynced(id,next);
       cloudWorkspaceId=id;activeRole=info.role;metaCache=info.meta;autoSync=info.role!=='viewer';
       window.QuadoCloudRemoteFile=async attachmentId=>downloadRemoteAttachment(attachmentId);
       if(info.role==='viewer')host.setRemoteReadOnly(true);
@@ -163,6 +215,7 @@
       const info=await access(id);
       if(info.exists&&!info.role)throw Error('Acesso ao quadro não autorizado.');
       if(info.exists&&info.role==='viewer')throw Error('Esta conta possui acesso somente de leitura.');
+      if(info.exists)await mergeRemote(id,info);
       const workspace=host.getWorkspace(),boards=Object.entries(workspace.canvases||{});
       if(!boards.length||boards.length>300)throw Error('Quantidade de pastas incompatível com esta operação.');
       const payloads=boards.map(([key,val])=>[key,JSON.stringify(val)]);
@@ -186,6 +239,7 @@
         batch.set(ref.collection('boards').doc(key),{payload,updatedAt:firebase.firestore.FieldValue.serverTimestamp()})
       }
       await batch.commit();
+      saveSynced(id,workspace);
       cloudWorkspaceId=id;activeRole=info.role||'owner';autoSync=true;
       const fresh=await access(id);metaCache=fresh.meta;
       updateAuthUI();renderMembers();status('Sincronizado: '+new Date().toLocaleTimeString('pt-BR'));
