@@ -81,7 +81,7 @@ export default {
   });
   const protectedServer=new OAuthResourceServer({
     resourceMetadata:{resource,authorization_servers:[origin],resource_name:NAME},
-    requiredScopes:['mcp:read'],
+    requiredScopes:['mcp:read','mcp:write'],
     validateToken:(environment)=>(res,token)=>authorization.validateToken(res,token,environment),
     handler:{fetch:(request,environment,context)=>mcpHandler(request,environment,context,insufficientScope)}
   });
