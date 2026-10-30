@@ -131,6 +131,18 @@ export async function saveBoard(env,uid,idToken,boardId,board,updateTime) {
     }})
   });
 }
+export function makeDocument(title, text, x=90, y=80) {
+  const heading=String(title||'Documento Quadro Livre').trim().slice(0,240);
+  const body=String(text||'').trim().slice(0,60000);
+  if(!heading||!body)throw Error('Título e conteúdo são obrigatórios.');
+  const note=makeNote('## '+heading+'\n\n'+body,x,y);
+  note.document=true;
+  note.documentTitle=heading;
+  note.w=620;
+  note.h=Math.min(900,Math.max(260,Math.ceil(body.length/3.2)));
+  note.color='#ffffff';
+  return note;
+}
 export function makeNote(text,x=90,y=80) {
   const title=String(text||'').slice(0,12000);
   if(!title.trim())throw Error('Informe o texto da anotação.');
