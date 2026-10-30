@@ -1,0 +1,50 @@
+name: Testes do plugin Quadro Livre MCP
+on:
+  pull_request:
+    paths:
+      - 'mcp/**'
+      - '.github/workflows/test-mcp.yml'
+  push:
+    branches:
+      - 'plugin-chatgpt-mcp-firebase'
+    paths:
+      - 'mcp/**'
+      - '.github/workflows/test-mcp.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mcp-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Instalar dependências
+        working-directory: mcp
+        run: npm install --no-audit --no-fund
+      - name: Verificar JavaScript
+        working-directory: mcp
+        run: npm run check
+      - name: Executar testes
+        working-directory: mcp
+        run: npm test
+      - name: Montar configuração de build de testes
+        working-directory: mcp
+        run: |
+          cp wrangler.example.jsonc wrangler.jsonc
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const file='wrangler.jsonc';
+          const config=JSON.parse(fs.readFileSync(file, 'utf8'));
+          config.kv_namespaces[0].id='00000000000000000000000000000000';
+          config.vars.MCP_ORIGIN='https://quadro-livre-mcp.example.workers.dev';
+          config.vars.FIREBASE_API_KEY='test-web-api-key';
+          fs.writeFileSync(file, JSON.stringify(config, null, 2));
+          NODE
+      - name: Verificar compilação Cloudflare (sem publicar)
+        working-directory: mcp
+        run: npx wrangler deploy --dry-run --outdir .wrangler-dry-run

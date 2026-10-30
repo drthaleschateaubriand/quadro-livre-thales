@@ -410,6 +410,12 @@
  .view-controls .secondary{height:34px}
  .view-controls .zoom-indicator{min-width:57px}
 }
+
+#cloud-workspace-controls{border-top:1px solid #e1e8f3;margin:12px 0;padding:11px 0}
+#cloud-workspace-controls[hidden]{display:none!important}
+#cloud-workspace-controls strong{font-size:13px}
+#cloud-workspace-controls .account-actions button{flex:1 1 100px}
+#cloud-sync-message{min-height:15px;font-weight:600}
 </style>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.9.1/mammoth.browser.min.js"></script>
@@ -418,6 +424,8 @@
 <script defer src="https://www.gstatic.com/firebasejs/11.10.0/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/11.10.0/firebase-auth-compat.js"></script>
 <script defer src="./account-auth.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore-compat.js"></script>
+<script defer src="./cloud-workspace.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -591,10 +599,21 @@
       <p id="account-current-email"></p>
       <p id="account-verification" class="account-help"></p>
       <div class="account-actions"><button type="button" id="account-verify">Reenviar e-mail de verificação</button><button type="button" id="account-refresh">Atualizar status</button></div>
+      <div id="cloud-workspace-controls" hidden>
+        <hr><strong>Meus quadros na nuvem</strong>
+        <p>Disponíveis em qualquer computador após o envio ao Firebase.</p>
+        <div class="account-actions">
+          <button type="button" id="cloud-upload">Enviar quadros locais</button>
+          <button type="button" id="cloud-download">Abrir quadros da nuvem</button>
+          <button type="button" id="cloud-backup">Baixar backup ZIP</button>
+        </div>
+        <p id="cloud-sync-message" role="status" aria-live="polite"></p>
+        <p class="account-help">PDFs, imagens e áudios binários ainda precisam de Cloud Storage para aparecer em outros dispositivos. As notas e a estrutura do quadro podem ser sincronizadas pelo Firestore.</p>
+      </div>
       <button type="button" id="account-signout" class="account-signout">Sair da conta</button>
     </div>
     <p id="account-message" role="status" aria-live="polite" hidden></p>
-    <p class="account-help">O login controla a sessão Firebase. Seus quadros e anexos atuais continuam salvos neste navegador até que a sincronização na nuvem seja ativada. Sair não apaga os arquivos locais.</p>
+    <p class="account-help">Sua conta pode enviar e abrir quadros por meio dos botões acima. Os arquivos locais não são apagados ao sair. Anexos binários ainda dependem de Cloud Storage.</p>
   </dialog>
   <input id="file-input" type="file" multiple hidden>
   <dialog id="slides-dialog" class="experience-dialog"><div class="experience-body"><div class="experience-top"><strong>Apresentação</strong><button type="button" class="icon-button" id="slides-close" aria-label="Fechar apresentação">×</button></div><div class="slide-display"><div id="slide-counter"></div><h2 id="slide-heading"></h2><p id="slide-description"></p></div><div class="slide-controls"><button class="secondary" id="slide-previous">Anterior</button><button class="primary" id="slide-next">Próximo</button></div></div></dialog>
@@ -724,7 +743,7 @@ async function displayAttachedImage(n,img){
 function emptyBoard(name='Nova pasta'){return{title:name,nodes:[],connectors:[],paths:[],arrows:[],brush:{...DEFAULT_BRUSH},locked:false,camera:{zoom:1,ox:innerWidth*.38,oy:innerHeight*.32}}}
 function captureBoard(){return JSON.parse(JSON.stringify({title:title.value||'Meu quadro',nodes,connectors,paths,arrows,brush,locked,camera:{zoom,ox,oy}}))}
 function snapshotWorkspace(){if(!workspace)workspace={version:2,folders:[],canvases:{root:emptyBoard('Meu primeiro quadro')},activeFolderId:'root'};workspace.canvases[activeFolderId]=captureBoard();workspace.activeFolderId=activeFolderId;return JSON.stringify(workspace)}
-async function save(){const serialized=snapshotWorkspace();try{await idbSet(serialized,WORKSPACE_KEY);status.textContent='Salvo neste dispositivo'}catch(e){status.textContent='Não foi possível salvar';toast('Espaço local insuficiente. Exporte um backup do projeto.')}}
+async function save(){const serialized=snapshotWorkspace();try{await idbSet(serialized,WORKSPACE_KEY);status.textContent='Salvo neste dispositivo';window.dispatchEvent(new Event('quadro:local-save'))}catch(e){status.textContent='Não foi possível salvar';toast('Espaço local insuficiente. Exporte um backup do projeto.')}}
 function openFolder(id){
  mobileEditingNodeId=null;lastTouchTap=null;
  hideContextToolbar();
@@ -2043,6 +2062,27 @@ viewport.addEventListener('pointerup',finishTouch,{capture:true});
 viewport.addEventListener('pointercancel',finishTouch,{capture:true});
 // Exportação de PNG via botão adicional, mantida independente do salvamento do projeto.
 const pngButton=document.createElement('button');pngButton.id='export-png';pngButton.className='secondary';pngButton.textContent='PNG';pngButton.title='Exportar imagem';pngButton.onclick=exportPng;$('#export-file').before(pngButton);
+window.QuadroCloudHost={
+  getWorkspace:()=>JSON.parse(snapshotWorkspace()),
+  async restoreWorkspace(remote){
+    if(!remote||remote.version!==2||!Array.isArray(remote.folders)||!remote.canvases?.root)throw Error('Formato da nuvem não reconhecido.');
+    if(!db)throw Error('Armazenamento local indisponível.');
+    await idbSet(JSON.stringify(getWorkspaceBeforeImport()),'quadro-livre-pre-cloud-'+Date.now());
+    workspace=remote;
+    activeFolderId=remote.canvases[remote.activeFolderId]?remote.activeFolderId:'root';
+    const data=remote.canvases[activeFolderId];
+    nodes=data.nodes||[];connectors=data.connectors||[];paths=data.paths||[];arrows=data.arrows||[];
+    brush=normalizeBrush(data.brush);syncBrushToolbar();
+    title.value=data.title||'Meu quadro';
+    locked=!!data.locked;zoom=Math.max(MIN_ZOOM,Math.min(MAX_ZOOM,data.camera?.zoom||1));
+    ox=Number.isFinite(data.camera?.ox)?data.camera.ox:innerWidth*.38;
+    oy=Number.isFinite(data.camera?.oy)?data.camera.oy:innerHeight*.32;
+    selected=null;history=[];future=[];interaction=null;mobileEditingNodeId=null;
+    render();updateCamera();setLocked(locked,true);renderFolders();updateUndoButtons();await save();
+  },
+  backup:exportProject,
+};
+function getWorkspaceBeforeImport(){return JSON.parse(snapshotWorkspace())}
 init();
 })();
 </script>

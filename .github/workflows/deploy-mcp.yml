@@ -1,0 +1,49 @@
+name: Publicar plugin MCP Quadro Livre (manual)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: quadro-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar dependências e validar
+        working-directory: mcp
+        run: |
+          npm install --no-audit --no-fund
+          npm run check
+          npm test
+      - name: Montar configuração sem incluir credenciais no GitHub
+        working-directory: mcp
+        env:
+          OAUTH_KV_ID: ${{ secrets.OAUTH_KV_ID }}
+          MCP_ORIGIN: ${{ vars.MCP_ORIGIN }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_AUTH_DOMAIN: ${{ vars.FIREBASE_AUTH_DOMAIN }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: |
+          node - <<'NODE'
+          import fs from 'node:fs';
+          const src=JSON.parse(fs.readFileSync('wrangler.example.jsonc','utf8'));
+          const required=['OAUTH_KV_ID','MCP_ORIGIN','FIREBASE_API_KEY','FIREBASE_AUTH_DOMAIN','FIREBASE_PROJECT_ID'];
+          for(const name of required)if(!process.env[name])throw Error('Variável de deploy ausente: '+name);
+          src.kv_namespaces[0].id=process.env.OAUTH_KV_ID;
+          src.vars.MCP_ORIGIN=process.env.MCP_ORIGIN;
+          src.vars.FIREBASE_API_KEY=process.env.FIREBASE_API_KEY;
+          src.vars.FIREBASE_AUTH_DOMAIN=process.env.FIREBASE_AUTH_DOMAIN;
+          src.vars.FIREBASE_PROJECT_ID=process.env.FIREBASE_PROJECT_ID;
+          fs.writeFileSync('wrangler.jsonc',JSON.stringify(src,null,2));
+          NODE
+      - name: Publicar em Cloudflare Workers
+        working-directory: mcp
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy

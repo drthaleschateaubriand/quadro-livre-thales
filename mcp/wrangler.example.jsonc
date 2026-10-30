@@ -1,0 +1,17 @@
+{
+  "name": "quadro-livre-mcp",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "workers_dev": true,
+  "observability": {"enabled": true},
+  "kv_namespaces": [
+    {"binding": "OAUTH_KV", "id": "SUBSTITUA_PELO_ID_GERADO_NO_CLOUDFLARE"}
+  ],
+  "vars": {
+    "MCP_ORIGIN": "https://quadro-livre-mcp.SUA_CONTA.workers.dev",
+    "FIREBASE_PROJECT_ID": "sample-firebase-ai-app-1d935",
+    "FIREBASE_AUTH_DOMAIN": "sample-firebase-ai-app-1d935.firebaseapp.com",
+    "FIREBASE_API_KEY": "COPIE_API_KEY_WEB_DO_ARQUIVO_FIREBASE_CONFIG_JS"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "quadro-livre-mcp",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["global_fetch_strictly_public"],
+  "workers_dev": true,
+  "observability": {"enabled": true},
+  "kv_namespaces": [
+    {"binding": "OAUTH_KV", "id": "e15dc55f98e74b8e8c7a38894f6049dc"}
+  ],
+  "vars": {
+    "MCP_ORIGIN": "https://quadro-livre-mcp.thalescriticalcare.workers.dev",
+    "FIREBASE_PROJECT_ID": "sample-firebase-ai-app-1d935",
+    "FIREBASE_AUTH_DOMAIN": "sample-firebase-ai-app-1d935.firebaseapp.com",
+    "FIREBASE_API_KEY": "AIzaSyBOqwTmPEFoK8kiITrvZ0ZMdeELWDcVRXU"
+  }
+}

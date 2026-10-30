@@ -8,6 +8,7 @@
  const signedOut=$('#account-logged-out'),signedIn=$('#account-logged-in');
  const message=$('#account-message');
  let auth=null,currentUser=null,ready=false;
+ window.QuadroFirebaseAuth={getAuth:()=>auth,getUser:()=>currentUser};
  const reveal=(element,shown)=>{element.hidden=!shown};
  function note(text,error=false){
   message.hidden=!text;
@@ -56,7 +57,7 @@
   const app=firebase.apps.length?firebase.app():firebase.initializeApp(config);
   auth=app.auth();
   auth.onAuthStateChanged(user=>{
-    currentUser=user;ready=true;render();
+    currentUser=user;ready=true;render();window.dispatchEvent(new Event('quadro:auth-changed'));
   },err=>{
     console.warn('Falha Firebase Auth:',err?.code);auth=null;ready=true;render();note(errorText(err),true);
   });
@@ -104,7 +105,7 @@
  $('#account-refresh').addEventListener('click',async()=>{
   if(!currentUser)return;
   try{await currentUser.reload();currentUser=auth.currentUser;await currentUser?.getIdToken(true);
-   render();note(currentUser?.emailVerified?'E-mail confirmado.':'Ainda não confirmado. Verifique o link enviado.');
+   render();window.dispatchEvent(new Event('quadro:auth-changed'));note(currentUser?.emailVerified?'E-mail confirmado.':'Ainda não confirmado. Verifique o link enviado.');
   }catch(err){note(errorText(err),true)}
  });
  $('#account-signout').addEventListener('click',async()=>{
