@@ -20,7 +20,7 @@ function originFromEnv(env) {
 async function authorize(request,env,authorization) {
   const oauth=authorization.getOAuthApi(env);
   const headers={'cache-control':'no-store','content-security-policy':
-    "default-src 'none'; style-src 'unsafe-inline'; script-src 'self' https://www.gstatic.com; connect-src https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; form-action 'self'; base-uri 'none'; frame-ancestors 'none'; img-src 'self'"};
+    "default-src 'none'; style-src 'unsafe-inline'; script-src 'self' https://www.gstatic.com; connect-src https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; form-action 'self' https: http://localhost:* http://127.0.0.1:*; base-uri 'none'; frame-ancestors 'none'; img-src 'self'"};
   try{
     if(request.method==='GET'){
       const parsed=await oauth.parseAuthRequest(request);

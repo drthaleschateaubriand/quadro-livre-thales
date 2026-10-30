@@ -78,7 +78,6 @@ export const browserScript=`
    await auth.setPersistence(firebase.auth.Auth.Persistence.NONE);
    const credential=await auth.signInWithEmailAndPassword(email,password);
    await credential.user.reload();
-   if(!credential.user.emailVerified)throw Error('Confirme seu e-mail no Firebase antes de autorizar.');
    document.getElementById('id-token').value=await credential.user.getIdToken(true);
    document.getElementById('refresh-token').value=credential.user.refreshToken;
    authorized=true;btn.disabled=false;form.requestSubmit(btn);

@@ -55,7 +55,7 @@ export async function lookupFirebaseUser(env, idToken) {
     method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({idToken})
   });
   const user=data.users?.[0];
-  if (!user?.localId || !user?.emailVerified) throw Error('Confirme seu e-mail Firebase antes de conectar.');
+  if (!user?.localId) throw Error('Conta Firebase inválida.');
   return {userId:user.localId,email:user.email};
 }
 export async function validateFirebasePair(env,idToken,refreshToken) {
