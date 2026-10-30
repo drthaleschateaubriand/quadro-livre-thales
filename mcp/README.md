@@ -92,3 +92,5 @@ Documentação de referência:
 ## Progresso do cliente web
 
 Nesta branch, o site também ganhou dois controles na seção Conta: `Enviar quadros locais` e `Abrir quadros da nuvem`. `cloud-workspace.js` usa a sessão do Firebase SDK já existente, nunca uma conta administrativa. Antes de trocar quadros, o navegador salva um backup JSON local e pede confirmação. A integração precisa de testes num projeto Firestore configurado com regras privadas. Enquanto essa branch não for incorporada ao ramo público, os botões não aparecerão no site publicado.
+
+<!-- Deployment verification trigger: keep production branch aligned with the integration branch. -->
