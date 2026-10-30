@@ -26,10 +26,11 @@ async function authorize(request,env,authorization) {
       const parsed=await oauth.parseAuthRequest(request);
       const details=await oauth.describeConsent(parsed);
       const begin=await oauth.beginConsent(parsed);
-      const h=new Headers(begin.headers);
+      const h=begin.headers;
       for(const [k,v] of Object.entries(headers))h.set(k,v);
       h.set('content-type','text/html; charset=utf-8');
       h.set('x-content-type-options','nosniff');
+      h.set('vary','Cookie');
       return new Response(consentPage(details,begin.handle,env),{headers:h});
     }
     if(request.method==='POST'){
