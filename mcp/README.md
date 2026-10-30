@@ -1,6 +1,6 @@
 # Plugin Quadro Livre para ChatGPT (MCP)
 
-**Estado:** primeira implementação em desenvolvimento, ainda **não publicada**. A versão pública do quadro em GitHub Pages continua intacta. O backend MCP fica nesta pasta, em Cloudflare Workers, e consulta apenas documentos já sincronizados no Firebase.
+**Estado:** servidor publicado e operacional em `https://quadro-livre-mcp.thalescriticalcare.workers.dev`. A PR nº 7 foi incorporada ao ramo público, o site em GitHub Pages continua operacional e a conexão final no ChatGPT depende da autorização do titular da conta.
 
 ## O que a primeira versão oferece
 
@@ -22,7 +22,7 @@
 3. Ter conta Cloudflare com Workers e KV habilitados.
 4. Dispor de acesso a configurar o plugin no ChatGPT. A conexão OAuth será concluída pelo usuário no navegador do ChatGPT.
 
-## Publicar o servidor no Cloudflare (após testes)
+## Publicar ou atualizar o servidor no Cloudflare
 
 ```bash
 cd mcp
@@ -45,7 +45,7 @@ npx wrangler deploy
 A implantação precisa ser validada via HTTPS:
 
 - `https://SEU_WORKER/health` retorna `status: ok`.
-- `https://SEU_WORKER/.well-known/oauth-protected-resource` ou `.../mcp` informa o servidor de autorização.
+- `https://SEU_WORKER/.well-known/oauth-protected-resource/mcp` informa o servidor de autorização.
 - `https://SEU_WORKER/.well-known/oauth-authorization-server` mostra o endpoint de OAuth e capacidade CIMD/DCR.
 - `POST https://SEU_WORKER/mcp` **sem token** retorna HTTP 401 com `WWW-Authenticate`, sem expor dados.
 - Autorizar uma conta Firebase de teste verificada e testar `listar_quadros` e `criar_nota` usando MCP Inspector.
@@ -70,7 +70,7 @@ Com o plugin conectado, experimente:
 
 ## Problemas conhecidos e limites
 
-- **Sem Cloudflare configurado, este código não está no ar.** Não existe link MCP funcional até publicar o Worker.
+- O Worker de produção está separado dos demais projetos Cloudflare e usa o KV dedicado `quadro-livre-mcp-oauth`; não reutilize bindings de outros Workers.
 - **Sem executar o primeiro envio pelo botão Conta, os quadros locais não estarão disponíveis ao plugin.** A sincronização é manual nesta etapa; um login sozinho não envia os documentos. Anexos binários permanecem em IndexedDB, mesmo após enviar o JSON do quadro.
 - As ferramentas operam **somente no workspace do usuário autenticado**. Convites de editor/leitor, colaboração simultânea e revisões compartilhadas ainda não foram integrados ao conector.
 - A sincronização do navegador não é tempo real: uma nota criada pelo ChatGPT precisará de recarregamento/recuperação do quadro no site. Editar simultaneamente o site e o plugin pode causar conflitos; o plugin usa controle de versão, mas o site deve usar a mesma estratégia para resolução completa.
@@ -91,4 +91,4 @@ Documentação de referência:
 
 ## Progresso do cliente web
 
-Nesta branch, o site também ganhou dois controles na seção Conta: `Enviar quadros locais` e `Abrir quadros da nuvem`. `cloud-workspace.js` usa a sessão do Firebase SDK já existente, nunca uma conta administrativa. Antes de trocar quadros, o navegador salva um backup JSON local e pede confirmação. A integração precisa de testes num projeto Firestore configurado com regras privadas. Enquanto essa branch não for incorporada ao ramo público, os botões não aparecerão no site publicado.
+Nesta branch, o site também ganhou dois controles na seção Conta: `Enviar quadros locais` e `Abrir quadros da nuvem`. `cloud-workspace.js` usa a sessão do Firebase SDK já existente, nunca uma conta administrativa. Antes de trocar quadros, o navegador salva um backup JSON local e pede confirmação. A integração precisa de testes num projeto Firestore configurado com regras privadas. Os controles foram incorporados ao ramo público pela PR nº 7; use primeiro dados fictícios e confirme o backup local antes de substituir quadros.
