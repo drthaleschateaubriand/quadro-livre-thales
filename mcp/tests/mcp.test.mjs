@@ -17,21 +17,22 @@ test('inicialização MCP identifica protocolo e ferramentas',async()=>{
   assert.equal(data.result.serverInfo.name,'quadro-livre');
   assert.equal(data.result.capabilities.tools.listChanged,false);
 });
-test('tools/list publica nove ferramentas com esquemas JSON válidos',async()=>{
+test('tools/list publica dez ferramentas com esquemas JSON válidos',async()=>{
   const response=await mcpHandler(request('tools/list',{}),{},auth);
   const result=await response.json();
   assert.equal(response.status,200);
-  assert.equal(result.result.tools.length,9);
-  assert.equal(TOOLS.length,9);
+  assert.equal(result.result.tools.length,10);
+  assert.equal(TOOLS.length,10);
   const names=new Set(TOOLS.map(t=>t.name));
-  assert.equal(names.size,9);
+  assert.equal(names.size,10);
   assert.ok(names.has('buscar_anotacoes'));
   assert.ok(names.has('criar_nota'));
   assert.ok(names.has('editar_nota'));
+  assert.ok(names.has('criar_documento'));
   for(const tool of TOOLS)assert.equal(tool.inputSchema.additionalProperties,false);
 });
 test('ferramentas de gravação exigem escopo de escrita',()=>{
-  for(const name of ['criar_nota','editar_nota']){
+  for(const name of ['criar_nota','editar_nota','criar_documento']){
     const tool=TOOLS.find(t=>t.name===name);
     assert.deepEqual(tool.securitySchemes[0].scopes,['mcp:read','mcp:write']);
   }
