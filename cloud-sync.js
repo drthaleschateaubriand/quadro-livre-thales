@@ -120,35 +120,84 @@
     }
   });
   function workspaceRef(id){return store.collection('workspaces').doc(id)}
-  // Mescla na cópia local objetos criados fora deste aparelho (ex.: ChatGPT/MCP) sem apagar nada local.
-  const syncedKey=id=>'quadro-cloud-synced-ids:'+id;
-  function loadSynced(id){try{return new Set(JSON.parse(localStorage.getItem(syncedKey(id))||'[]'))}catch{return new Set()}}
+  // Sincronização com exclusões: guarda "lápides" (IDs apagados) para que itens removidos não voltem da nuvem.
+  // known = IDs presentes localmente na última reconciliação; tomb = IDs apagados (locais e vindos da nuvem).
+  const knownKey=id=>'quadro-cloud-known:'+id,tombKey=id=>'quadro-cloud-tomb:'+id,legacyKey=id=>'quadro-cloud-synced-ids:'+id;
+  const TOMB_CAP=5000;
+  const readJSON=(k,f)=>{try{const v=JSON.parse(localStorage.getItem(k)||'null');return v??f}catch{return f}};
+  function loadKnown(id){
+    const k=readJSON(knownKey(id),null);
+    if(k&&Array.isArray(k.nodes))return {nodes:new Set(k.nodes),boards:new Set(k.boards||[])};
+    return {nodes:new Set(readJSON(legacyKey(id),[])),boards:new Set()}; // migração da versão anterior
+  }
+  function loadTomb(id){const t=readJSON(tombKey(id),{});return {nodes:new Set(t.nodes||[]),boards:new Set(t.boards||[])}}
+  function saveTomb(id,t){const cap=s=>[...s].slice(-TOMB_CAP);
+    try{localStorage.setItem(tombKey(id),JSON.stringify({nodes:cap(t.nodes),boards:cap(t.boards)}))}catch{}}
+  const nodeIds=b=>(b?.nodes||[]).map(n=>n&&n.id).filter(Boolean);
   function saveSynced(id,workspace){
-    const ids=Object.values(workspace.canvases||{}).flatMap(b=>(b.nodes||[]).map(n=>n&&n.id)).filter(Boolean);
-    try{localStorage.setItem(syncedKey(id),JSON.stringify(ids))}catch{}
+    const cs=Object.entries(workspace.canvases||{});
+    try{localStorage.setItem(knownKey(id),JSON.stringify({nodes:cs.flatMap(([,b])=>nodeIds(b)),boards:cs.map(([k])=>k)}))}catch{}
   }
   async function fetchCloudBoards(id){
-    const all=await workspaceRef(id).collection('boards').get();const canvases={};
-    all.forEach(doc=>{try{const b=JSON.parse(doc.data().payload||'null');if(b&&typeof b==='object')canvases[doc.id]=b}catch{}});
-    return canvases;
+    const all=await workspaceRef(id).collection('boards').get();const canvases={},raw={};
+    all.forEach(doc=>{try{const p=doc.data().payload;const b=JSON.parse(p||'null');if(b&&typeof b==='object'){canvases[doc.id]=b;raw[doc.id]=p}}catch{}});
+    return {canvases,raw};
   }
-  async function mergeRemote(id,info){
-    if(!info?.exists||!info.role)return 0;
-    const cloud=await fetchCloudBoards(id),local=host.getWorkspace(),synced=loadSynced(id);
-    local.canvases=local.canvases||{};let added=0;
-    for(const [key,board] of Object.entries(cloud)){
+  const WELCOME=[['note',/^Bem-vindo ao Quadro Livre!/],['text',/^Meu espaço de estudos$/]];
+  // Reconciliação local x nuvem. Retorna {changed,added,removed,tomb,cloud}.
+  async function reconcile(id,info){
+    const tomb=loadTomb(id);
+    if(!info?.exists||!info.role)return {changed:false,added:0,removed:0,tomb,cloud:{canvases:{},raw:{}}};
+    const cloud=await fetchCloudBoards(id),local=host.getWorkspace(),known=loadKnown(id);
+    local.canvases=local.canvases||{};local.folders=Array.isArray(local.folders)?local.folders:[];
+    // 1) Exclusões feitas neste aparelho desde a última reconciliação.
+    const localIds=new Set(Object.values(local.canvases).flatMap(nodeIds));
+    for(const n of known.nodes)if(!localIds.has(n))tomb.nodes.add(n);
+    for(const b of known.boards)if(b!=='root'&&!local.canvases[b])tomb.boards.add(b);
+    // 2) Exclusões vindas da nuvem (outros aparelhos).
+    const remoteNodeTomb=new Set(Object.values(cloud.canvases).flatMap(b=>Array.isArray(b.deletedNodeIds)?b.deletedNodeIds:[]));
+    const remoteBoardTomb=new Set(Array.isArray(info.meta?.deletedBoardIds)?info.meta.deletedBoardIds:[]);
+    // Itens restaurados aqui (ex.: desfazer) depois de apagados: presentes localmente, ausentes em known e com lápide.
+    for(const n of localIds)if(!known.nodes.has(n)&&(tomb.nodes.has(n)||remoteNodeTomb.has(n))){tomb.nodes.delete(n);remoteNodeTomb.delete(n)}
+    remoteNodeTomb.forEach(x=>tomb.nodes.add(x));remoteBoardTomb.forEach(x=>{if(x!=='root')tomb.boards.add(x)});
+    let added=0,removed=0;
+    for(const key of Object.keys(local.canvases)){
+      if(key!=='root'&&remoteBoardTomb.has(key)){delete local.canvases[key];local.folders=local.folders.filter(f=>f?.id!==key);removed++;continue}
+      const b=local.canvases[key];if(!Array.isArray(b.nodes))continue;
+      const before=b.nodes.length;b.nodes=b.nodes.filter(n=>!(n&&remoteNodeTomb.has(n.id)));removed+=before-b.nodes.length;
+    }
+    // 3) Itens novos da nuvem (ex.: ChatGPT/MCP) que não foram apagados.
+    for(const [key,board] of Object.entries(cloud.canvases)){
+      if(tomb.boards.has(key))continue;
       const mine=local.canvases[key];
-      if(!mine){local.canvases[key]=board;added+=(board.nodes||[]).length||1;
-        if(Array.isArray(info.meta?.folders)&&Array.isArray(local.folders)){const f=info.meta.folders.find(x=>x&&x.id===key);if(f&&!local.folders.some(x=>x&&x.id===key))local.folders.push(f)}
+      if(!mine){
+        const copy={...board,nodes:(board.nodes||[]).filter(n=>n&&!tomb.nodes.has(n.id))};delete copy.deletedNodeIds;
+        local.canvases[key]=copy;added+=copy.nodes.length||1;
+        const f=Array.isArray(info.meta?.folders)&&info.meta.folders.find(x=>x&&x.id===key);
+        if(f&&!local.folders.some(x=>x&&x.id===key))local.folders.push(f);
         continue}
       mine.nodes=Array.isArray(mine.nodes)?mine.nodes:[];
       const have=new Set(mine.nodes.map(n=>n&&n.id));
-      for(const n of board.nodes||[]){if(n&&n.id&&!have.has(n.id)&&!synced.has(n.id)){mine.nodes.push(n);added++}}
+      for(const n of board.nodes||[]){if(n&&n.id&&!have.has(n.id)&&!tomb.nodes.has(n.id)){mine.nodes.push(n);have.add(n.id);added++}}
     }
-    if(added){suppressLocalEvent=true;try{await host.replaceWorkspace(local)}finally{suppressLocalEvent=false}
-      host.toast?.(added===1?'1 item novo da nuvem adicionado ao quadro.':added+' itens novos da nuvem adicionados ao quadro.')}
-    return added;
+    // 4) Remove duplicatas idênticas da nota de boas-vindas/título padrão (mesmo tipo e mesmo texto).
+    let deduped=0;const root=local.canvases.root;
+    if(root&&Array.isArray(root.nodes)){
+      const seen=new Set();
+      root.nodes=root.nodes.filter(n=>{
+        const w=n&&WELCOME.find(([t,re])=>n.type===t&&re.test(String(n.text||'').trim()));
+        if(!w)return true;const sig=n.type+'|'+String(n.text||'').trim();
+        if(!seen.has(sig)){seen.add(sig);return true}
+        tomb.nodes.add(n.id);deduped++;return false;
+      });
+    }
+    const changed=!!(added||removed||deduped);
+    if(changed){suppressLocalEvent=true;try{await host.replaceWorkspace(local)}finally{suppressLocalEvent=false}
+      if(added)host.toast?.(added===1?'1 item novo da nuvem adicionado ao quadro.':added+' itens novos da nuvem adicionados ao quadro.')}
+    saveTomb(id,tomb);saveSynced(id,changed?local:host.getWorkspace());
+    return {changed,added,removed:removed+deduped,tomb,cloud};
   }
+  async function mergeRemote(id,info){const r=await reconcile(id,info);return r.changed}
   async function autoConnect(){
     if(!user||!emailVerified||busy||cloudWorkspaceId)return;
     busy=true;
@@ -212,33 +261,54 @@
     busy=true;report('');status('Enviando alterações...');
     try{
       const id=cloudWorkspaceId||user.uid;
-      const info=await access(id);
+      let info=await access(id);
       if(info.exists&&!info.role)throw Error('Acesso ao quadro não autorizado.');
       if(info.exists&&info.role==='viewer')throw Error('Esta conta possui acesso somente de leitura.');
-      if(info.exists)await mergeRemote(id,info);
-      const workspace=host.getWorkspace(),boards=Object.entries(workspace.canvases||{});
-      if(!boards.length||boards.length>300)throw Error('Quantidade de pastas incompatível com esta operação.');
-      const payloads=boards.map(([key,val])=>[key,JSON.stringify(val)]);
-      const encoder=new TextEncoder();
-      for(const [key,payload] of payloads){
-        if(encoder.encode(payload).length>750000)throw Error('O quadro “'+key+'” ultrapassa o limite do Firestore. Faça um backup ZIP e reduza as imagens embutidas antes de sincronizar.');
+      const ref=workspaceRef(id),isOwner=id===user.uid;
+      let workspace=null;
+      for(let attempt=0;;attempt++){
+        const r=await reconcile(id,info);
+        workspace=host.getWorkspace();const boards=Object.entries(workspace.canvases||{});
+        if(!boards.length||boards.length>300)throw Error('Quantidade de pastas incompatível com esta operação.');
+        const tombNodes=[...r.tomb.nodes].slice(-TOMB_CAP),tombBoards=[...r.tomb.boards].filter(b=>b!=='root').slice(-TOMB_CAP);
+        const payloads=boards.map(([key,val])=>{
+          const out={...val};delete out.deletedNodeIds;
+          if(key==='root')out.deletedNodeIds=tombNodes; // lápides ficam no quadro principal
+          return [key,JSON.stringify(out)];
+        });
+        const encoder=new TextEncoder();
+        for(const [key,payload] of payloads){
+          if(!/^[A-Za-z0-9_-]{1,140}$/.test(key))throw Error('Identificador de pasta inválido para sincronizar.');
+          if(encoder.encode(payload).length>750000)throw Error('O quadro “'+key+'” ultrapassa o limite do Firestore. Faça um backup ZIP e reduza as imagens embutidas antes de sincronizar.');
+        }
+        const changedPayloads=payloads.filter(([key,p])=>r.cloud.raw[key]!==p);
+        const staleBoards=isOwner?Object.keys(r.cloud.raw).filter(k=>k!=='root'&&!workspace.canvases[k]&&r.tomb.boards.has(k)):[];
+        try{
+          await store.runTransaction(async tx=>{
+            // Confere se a nuvem mudou (ex.: ChatGPT/MCP gravou) desde a leitura; se mudou, reconcilia de novo.
+            const refs=changedPayloads.map(([key])=>ref.collection('boards').doc(key));
+            const snaps=await Promise.all(refs.map(x=>tx.get(x)));
+            snaps.forEach((snap,i)=>{const key=changedPayloads[i][0];
+              const now=snap.exists?snap.data().payload:undefined;if(now!==r.cloud.raw[key])throw Object.assign(Error('conflict'),{code:'sync-conflict'})});
+            if(!info.exists){
+              if(!isOwner)throw Error('Só o proprietário pode criar o quadro inicial.');
+              tx.set(ref,{ownerUid:user.uid,name:workspace.canvases.root?.title||'Quadro Livre',
+                members:{},folders:workspace.folders||[],activeFolderId:workspace.activeFolderId||'root',deletedBoardIds:tombBoards,
+                updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+            }else if(isOwner){
+              tx.update(ref,{name:workspace.canvases.root?.title||'Quadro Livre',
+                folders:workspace.folders||[],activeFolderId:workspace.activeFolderId||'root',deletedBoardIds:tombBoards,
+                updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
+            }
+            changedPayloads.forEach(([,payload],i)=>tx.set(refs[i],{payload,updatedAt:firebase.firestore.FieldValue.serverTimestamp()}));
+            staleBoards.forEach(k=>tx.delete(ref.collection('boards').doc(k)));
+          });
+          break;
+        }catch(e){
+          if(e?.code!=='sync-conflict'||attempt>=3)throw e;
+          info=await access(id);
+        }
       }
-      const batch=store.batch(),ref=workspaceRef(id);
-      if(!info.exists){
-        if(id!==user.uid)throw Error('Só o proprietário pode criar o quadro inicial.');
-        batch.set(ref,{ownerUid:user.uid,name:workspace.canvases.root?.title||'Quadro Livre',
-          members:{},folders:workspace.folders||[],activeFolderId:workspace.activeFolderId||'root',
-          updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
-      }else if(id===user.uid){
-        batch.update(ref,{name:workspace.canvases.root?.title||'Quadro Livre',
-          folders:workspace.folders||[],activeFolderId:workspace.activeFolderId||'root',
-          updatedAt:firebase.firestore.FieldValue.serverTimestamp()});
-      }
-      for(const [key,payload] of payloads){
-        if(!/^[A-Za-z0-9_-]{1,140}$/.test(key))throw Error('Identificador de pasta inválido para sincronizar.');
-        batch.set(ref.collection('boards').doc(key),{payload,updatedAt:firebase.firestore.FieldValue.serverTimestamp()})
-      }
-      await batch.commit();
       saveSynced(id,workspace);
       cloudWorkspaceId=id;activeRole=info.role||'owner';autoSync=true;
       const fresh=await access(id);metaCache=fresh.meta;
