@@ -6,7 +6,8 @@
   "workers_dev": true,
   "observability": {"enabled": true},
   "kv_namespaces": [
-    {"binding": "OAUTH_KV", "id": "e15dc55f98e74b8e8c7a38894f6049dc"}
+    {"binding": "OAUTH_KV", "id": "e15dc55f98e74b8e8c7a38894f6049dc"},
+    {"binding": "IMAGES", "id": "f21aa2ebdfda47078e222360ecd37ff9"}
   ],
   "vars": {
     "MCP_ORIGIN": "https://quadro-livre-mcp.thalescriticalcare.workers.dev",

@@ -71,6 +71,15 @@ export default {
   const route=new URL(request.url).pathname;
   if(route==='/health')return json({status:'ok',service:NAME,build:'0.1.0'});
   if(route==='/favicon.ico')return new Response(null,{status:204});
+  if(route.startsWith('/img/')){
+    const id=route.slice(5);
+    if(!/^[0-9a-f-]{36}$/.test(id)||!env.IMAGES||request.method!=='GET'&&request.method!=='HEAD')return new Response('Not found',{status:404});
+    const {value,metadata}=await env.IMAGES.getWithMetadata('img:'+id,{type:'arrayBuffer'});
+    if(!value)return new Response('Not found',{status:404});
+    return new Response(request.method==='HEAD'?null:value,{headers:{'content-type':metadata?.mime||'application/octet-stream',
+      'cache-control':'public, max-age=31536000, immutable','access-control-allow-origin':'*',
+      'x-content-type-options':'nosniff','content-security-policy':"default-src 'none'"}});
+  }
   try{assertConfigured(env)}catch{return json({status:'unconfigured',message:'Configuração do servidor pendente.'},503)}
   const origin=originFromEnv(env);
   const resource=origin+'/mcp';

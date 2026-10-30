@@ -21,10 +21,10 @@ test('tools/list publica dez ferramentas com esquemas JSON válidos',async()=>{
   const response=await mcpHandler(request('tools/list',{}),{},auth);
   const result=await response.json();
   assert.equal(response.status,200);
-  assert.equal(result.result.tools.length,10);
-  assert.equal(TOOLS.length,10);
+  assert.equal(result.result.tools.length,11);
+  assert.equal(TOOLS.length,11);
   const names=new Set(TOOLS.map(t=>t.name));
-  assert.equal(names.size,10);
+  assert.equal(names.size,11);
   assert.ok(names.has('buscar_anotacoes'));
   assert.ok(names.has('criar_nota'));
   assert.ok(names.has('editar_nota'));
