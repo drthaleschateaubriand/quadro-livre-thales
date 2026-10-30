@@ -73,7 +73,7 @@ export default {
   if(route==='/favicon.ico')return new Response(null,{status:204});
   try{assertConfigured(env)}catch{return json({status:'unconfigured',message:'Configuração do servidor pendente.'},503)}
   const origin=originFromEnv(env);
-  // ChatGPT sends the server origin as the OAuth resource identifier.\n  // Keep it identical to the configured protected resource to avoid invalid_target.\n  const resource=origin;
+  const resource=origin+'/mcp';
   const authorization=new OAuthAuthorizationServer({
     issuer:origin,resources:[resource],scopesSupported:SCOPES,
     clientIdMetadataDocumentEnabled:true,
