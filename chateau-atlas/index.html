@@ -149,7 +149,15 @@
         state.boardId=boards.files[0].id;
         const res=await api("/drive/v3/files/"+encodeURIComponent(state.boardId)+"?alt=media");
         const xml=await res.text();
-        if(xml.trim()){state.xml=xml;storeDraft();state.dirty=false;send({action:"load",xml:state.xml,autosave:1,title:"Chateau Atlas",noExitBtn:1});}
+        if(xml.trim()){
+          if(state.xml!==EMPTY_XML && state.xml!==xml &&
+             !window.confirm("Há um rascunho local diferente do quadro no Google Drive. OK: abrir o quadro do Drive. Cancelar: manter o rascunho local e salvá-lo no Drive.")){
+            state.dirty=true;await saveBoard();
+          }else{
+            state.xml=xml;storeDraft();state.dirty=false;
+            send({action:"load",xml:state.xml,autosave:1,title:"Chateau Atlas",noExitBtn:1});
+          }
+        }
       }else{
         state.boardId=null;state.dirty=true;await saveBoard();
       }
