@@ -6,6 +6,9 @@ import { dirname, join } from "node:path";
 import vm from "node:vm";
 
 const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "index.html"), "utf8");
+const documentScript = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "documents.js"), "utf8");
+new vm.Script(documentScript, {filename:"chateau-atlas/documents.js"});
+assert.match(html, /<script src="\.\/documents\.js"><\/script>/, "Biblioteca de documentos precisa ser carregada");
 const inlineScripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
   .map(match => match[1].trim()).filter(Boolean);
 assert.equal(inlineScripts.length, 1, "Exatamente um script local para facilitar auditoria");
@@ -54,6 +57,7 @@ const sandbox = {
   document: { getElementById: node },
   window: {
     addEventListener(type, fn) { windows.set(type, fn); },
+    AtlasDocuments: {create:()=>({loadLayout:async()=>{},addFile(){},showFile(){}})},
     open() {}
   },
   localStorage: {
@@ -84,5 +88,51 @@ assert.equal(messages.at(-1).action, "export", "Salvar deve pedir XML atual ao e
 assert.equal(messages.at(-1).format, "xml", "Exportação para salvar precisa ser XML");
 console.log("Chateau Atlas: protocolo do editor, isolamento de origem e rascunho local aprovados.");
 
+// Confirma que os arquivos aparecem na camada visual e não como texto base64 no draw.io.
+const visualLayer={children:[],append(...children){this.children.push(...children);}};
+const visualStore=new Map();
+function element(tag="div"){
+  return {
+    tagName:tag.toUpperCase(),style:{},dataset:{},className:"",textContent:"",
+    children:[],events:{},
+    append(...children){this.children.push(...children);},
+    replaceChildren(...children){this.children=children;},
+    addEventListener(type,fn){this.events[type]=fn;},
+    scrollIntoView(){},remove(){},
+    get offsetWidth(){return parseInt(this.style.width)||560;},
+    get offsetHeight(){return parseInt(this.style.height)||500;}
+  };
+}
+const simulatedWindow={addEventListener(){},open(){}};
+const viewerContext={
+  window:simulatedWindow,
+  document:{getElementById:id=>id==="documentLayer"?visualLayer:element(),createElement:element},
+  localStorage:{getItem:id=>visualStore.get(id)||null,setItem:(id,val)=>visualStore.set(id,val)},
+  ResizeObserver:class{observe(){}},
+  Blob,URL,console,setTimeout,clearTimeout
+};
+new vm.Script(documentScript).runInNewContext(viewerContext);
+const viewer=simulatedWindow.AtlasDocuments.create({
+  getFolderId:()=>null,getToken:()=>null,notice(){},
+  api:async()=>{throw Error("API não deve ser chamada para visualização local");},
+  jsonApi:async()=>({files:[]}),uploadMedia:async()=>({id:"test"})
+});
+for(const [name,mime,tag] of [
+  ["apostila.pdf","application/pdf","IFRAME"],
+  ["foto.png","image/png","IMG"],
+  ["aula.mp4","video/mp4","VIDEO"],
+  ["gravacao.mp3","audio/mpeg","AUDIO"]
+]){
+  viewer.addFile({id:"file-test-"+name.replaceAll(".","-"),name,mimeType:mime,size:18},new Blob(["teste"],{type:mime}));
+  const card=visualLayer.children.at(-1);
+  assert.equal(card.className,"atlas-document",name+" deve entrar na área do quadro");
+  assert.equal(card.children[1].children.at(0).tagName,tag,name+" deve ter visualizador no quadro");
+}
+viewer.addFile({id:"file-test-docx",name:"relatorio.docx",
+  mimeType:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",size:150});
+assert.equal(visualLayer.children.at(-1).children[1].children.at(1).tagName,"IFRAME",
+  "Word deve tentar pré-visualização do Google Drive dentro do quadro");
+assert.equal(visualLayer.children.length,5,"Cinco documentos devem aparecer sobre o editor");
+console.log("Chateau Atlas: 5 formatos visuais simulados e posições locais verificados.");
 console.log("Chateau Atlas: " + required.length + " verificações estáticas e sintaxe JavaScript aprovadas.");
 console.log("Pendente: login OAuth real, uploads, salvamento, visualização e teste em navegador.");
