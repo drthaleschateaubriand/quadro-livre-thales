@@ -337,10 +337,20 @@
       notice("Cartão do documento enviado ao editor.");
     }
     async function uploadFiles(files){
-      if(!state.token){$("drawer").hidden=false;notice("Conecte o Drive antes de enviar arquivos.");return;}
-      for(const file of files){
-        notice("Enviando: "+file.name);
-        try{const uploaded=await uploadMedia(file.name,file.type||"application/octet-stream",file);addCard(uploaded);}
+      if(!state.token){
+        pendingFiles.push(...files);
+        $("drawer").hidden=false;
+        notice("Arquivos selecionados. Autorize sua conta Google para enviá-los.");
+        await connect();return;
+      }
+      for(let i=0;i<files.length;i++){
+        const file=files[i];
+        notice("Enviando "+(i+1)+" de "+files.length+": "+file.name);
+        try{
+          const uploaded=await uploadMedia(file.name,file.type||guessMime(file),file);
+          fileIndex.set(uploaded.id,{...uploaded,size:String(file.size),mimeType:uploaded.mimeType||file.type||guessMime(file)});
+          addCard(uploaded);
+        }
         catch(e){notice("Falha ao enviar "+file.name+": "+e.message);return;}
       }
       notice("Arquivos enviados ao Google Drive.");
@@ -352,8 +362,20 @@
     $("changeClient").addEventListener("click",setClientId);
     $("drawerBtn").addEventListener("click",()=>{const hidden=$("drawer").hidden;$("drawer").hidden=!hidden;$("drawerBtn").setAttribute("aria-expanded",String(hidden));});
     $("closeDrawer").addEventListener("click",()=>{$("drawer").hidden=true;$("drawerBtn").setAttribute("aria-expanded","false");});
-    $("upload").addEventListener("click",()=>{if(state.token)$("picker").click();else connect();});
-    $("chooseFile").addEventListener("click",()=>{if(state.token)$("picker").click();else connect();});
+    $("upload").addEventListener("click",()=>$("picker").click());
+    $("chooseFile").addEventListener("click",()=>$("picker").click());
+    $("dropZone").addEventListener("click",()=>$("picker").click());
+    $("dropZone").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();$("picker").click();}});
+    for(const target of [$("dropZone"),$("drawer")]){
+      target.addEventListener("dragover",e=>{
+        if(e.dataTransfer?.types?.includes("Files")){e.preventDefault();$("dropZone").classList.add("dragging");}
+      });
+      target.addEventListener("dragleave",()=>$("dropZone").classList.remove("dragging"));
+      target.addEventListener("drop",e=>{
+        e.preventDefault();e.stopPropagation();$("dropZone").classList.remove("dragging");
+        if(e.dataTransfer?.files?.length)void uploadFiles([...e.dataTransfer.files]);
+      });
+    }
     $("picker").addEventListener("change",e=>{const files=[...e.target.files];e.target.value="";if(files.length)uploadFiles(files);});
     $("refresh").addEventListener("click",async()=>{try{await refreshFiles();notice("Biblioteca atualizada.");}catch(e){notice(e.message);}});
     $("save").addEventListener("click",()=>{
