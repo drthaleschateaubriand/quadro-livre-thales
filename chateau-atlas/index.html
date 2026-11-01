@@ -25,6 +25,11 @@
     #files{padding:0;list-style:none}#files li{display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #edf0f4;font-size:13px;min-width:0}
     #files li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
     #files li button{font-size:12px;padding:5px 7px}
+    #dropZone{padding:16px;border:2px dashed #91a6c3;border-radius:10px;background:#f5f8ff;text-align:center;font-size:13px;color:#2c486c;cursor:pointer}
+    #dropZone.dragging{border-color:#2857b0;background:#e4edff}
+    #fileHint{font-size:12px;color:#526783;margin-top:8px}
+    #previewBody .fallback{width:100%;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;min-height:50vh;color:#526783;text-align:center}
+    #previewBody .fallback iframe{min-height:55vh;width:100%}
     #previewDialog{border:1px solid #d8e0ea;border-radius:12px;padding:0;width:min(1000px,96vw);max-width:none;max-height:93dvh;background:#fff;box-shadow:0 16px 60px #14213955}
     #previewDialog::backdrop{background:#0b152b99}
     .previewHead{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #dde4ee}
@@ -54,10 +59,12 @@
       <div class="row" style="justify-content:space-between;align-items:center"><h2>Arquivos no Atlas</h2><button id="closeDrawer" type="button">Fechar</button></div>
       <p>Os arquivos originais ficam no seu Google Drive. No quadro, cada documento ganha um cartão com link para abri-lo.</p>
       <div class="row">
-        <button id="chooseFile" type="button">Enviar arquivos</button>
+        <button id="chooseFile" type="button">Adicionar do dispositivo</button>
         <button id="refresh" type="button">Atualizar lista</button>
         <button id="save" type="button">Salvar quadro</button>
       </div>
+      <div id="dropZone" role="button" tabindex="0" aria-label="Adicionar arquivos do dispositivo">Arraste os arquivos para cá ou clique para escolher<strong style="display:block;margin-top:8px">PDF, Word, Excel, PowerPoint, MP3, MP4, imagens e outros formatos</strong></div>
+      <p id="fileHint">Os arquivos vão para uma pasta no Google Drive. Cada arquivo também ganha um cartão clicável na tela do Atlas.</p>
       <p class="hint">O editor é o modo oficial incorporado do diagrams.net. O arquivo do quadro é salvo como .drawio no Drive após a autorização. Sem conexão, as alterações ficam apenas como rascunho neste navegador.</p>
       <ul id="files"><li><span>Conecte sua conta Google para consultar os arquivos.</span></li></ul>
       <button id="changeClient" type="button">Configurar acesso Google</button>
@@ -85,7 +92,22 @@
     const IMAGE_TYPES = new Set(["image/png","image/jpeg","image/gif","image/webp"]);
     const VIDEO_TYPES = new Set(["video/mp4","video/webm"]);
     const AUDIO_TYPES = new Set(["audio/mpeg","audio/mp4","audio/ogg","audio/wav","audio/x-wav"]);
-    const TEXT_TYPES = new Set(["text/plain","text/markdown","text/csv","application/json"]);
+    const TEXT_TYPES = new Set(["text/plain","text/markdown","text/csv","application/json","text/html","text/xml"]);
+    const pendingFiles = [];
+    const fileIndex = new Map();
+    function guessMime(file) {
+      const extension=(file.name||"").toLowerCase().split(".").pop();
+      const types={
+        pdf:"application/pdf",doc:"application/msword",docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        xls:"application/vnd.ms-excel",xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ppt:"application/vnd.ms-powerpoint",pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        mp3:"audio/mpeg",m4a:"audio/mp4",wav:"audio/wav",ogg:"audio/ogg",
+        mp4:"video/mp4",mov:"video/quicktime",webm:"video/webm",avi:"video/x-msvideo",
+        png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",
+        txt:"text/plain",md:"text/markdown",csv:"text/csv",json:"application/json"
+      };
+      return types[extension]||"application/octet-stream";
+    }
     const state = {
       xml: localStorage.getItem(DRAFT_KEY) || EMPTY_XML, ready: false,
       token: null, folderId: null, boardId: null,
@@ -107,14 +129,22 @@
       if(event.origin !== EDITOR_ORIGIN || event.source !== frame.contentWindow) return;
       let msg;try { msg=typeof event.data==="string"?JSON.parse(event.data):event.data; }catch{return;}
       if(!msg || !msg.event) return;
-      if(msg.event==="init"){ state.ready=true; send({action:"load",xml:state.xml,autosave:1,title:"Chateau Atlas",noExitBtn:1}); }
+      if(msg.event==="init"){ state.ready=true; send({action:"load",xml:state.xml,autosave:1,title:"Chateau Atlas",noExitBtn:1,suppressNewWindows:true}); }
       if(msg.event==="autosave"||msg.event==="save") changed(msg.xml);
       if(msg.event==="export" && msg.format==="xml") {
         changed(msg.xml);
         if(state.token) void saveBoard();
       }
       if(msg.event==="merge" && !msg.error) send({action:"export",format:"xml"});
-      if(msg.event==="openLink" && msg.href){ try {const url=new URL(msg.href);if(url.protocol==="https:") window.open(url.href,"_blank","noopener,noreferrer");}catch{} }
+      if(msg.event==="openLink" && msg.href){
+        try{
+          const url=new URL(msg.href);
+          if(url.protocol!=="https:")return;
+          const match=url.hostname==="drive.google.com" && url.pathname.match(/^\/file\/d\/([^/]+)\/view$/);
+          const file=match&&fileIndex.get(decodeURIComponent(match[1]));
+          if(file&&state.token){void previewFile(file);}else window.open(url.href,"_blank","noopener,noreferrer");
+        }catch{}
+      }
     });
     function clientId(){return localStorage.getItem(CLIENT_KEY)||"";}
     function setClientId(){
@@ -132,7 +162,12 @@
           if(response.error||!response.access_token){notice("A autorização do Google não foi concluída.");return;}
           state.token=response.access_token;
           $("connect").textContent="Drive conectado";
-          try{notice("Procurando biblioteca no Drive...");await initializeDrive();notice("Drive conectado. Salvamento disponível.");}
+          try{
+            notice("Procurando biblioteca no Drive...");
+            await initializeDrive();
+            notice("Drive conectado. Salvamento disponível.");
+            if(pendingFiles.length)await uploadFiles(pendingFiles.splice(0));
+          }
           catch(e){notice("Erro do Drive: "+e.message);}
         },
         error_callback:()=>notice("Não foi possível abrir a autorização Google.")
@@ -216,24 +251,22 @@
     }
     async function refreshFiles(){
       if(!state.folderId)return;
-      const list=$("files");list.replaceChildren();
+      const list=$("files");list.replaceChildren();fileIndex.clear();
       let pageToken="",count=0;
       do {
         const path=driveQuery("'"+state.folderId+"' in parents and trashed=false")+(pageToken?"&pageToken="+encodeURIComponent(pageToken):"");
         const data=await jsonApi(path);
         for(const file of (data.files||[])){
           if(file.name===BOARD_NAME)continue;
+          fileIndex.set(file.id,file);
           count++;
           const li=document.createElement("li"),name=document.createElement("span"),open=document.createElement("button"),add=document.createElement("button"),preview=document.createElement("button");
           name.textContent=file.name;name.title=file.name;
           open.textContent="Abrir";open.addEventListener("click",()=>window.open("https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/view","_blank","noopener,noreferrer"));
           add.textContent="No quadro";add.addEventListener("click",()=>addCard(file));
           preview.textContent="Visualizar";
-          const mime=file.mimeType||"";
-          if(mime==="application/pdf"||IMAGE_TYPES.has(mime)||VIDEO_TYPES.has(mime)||AUDIO_TYPES.has(mime)||TEXT_TYPES.has(mime)){
-            preview.addEventListener("click",()=>void previewFile(file));
-            li.append(name,preview,open,add);
-          }else li.append(name,open,add);
+          preview.addEventListener("click",()=>void previewFile(file));
+          li.append(name,preview,open,add);
           list.append(li);
         }
         pageToken=data.nextPageToken||"";
@@ -248,13 +281,21 @@
     }
     function closePreview(){ $("previewDialog").close();clearPreview(); }
     function canPreview(mime){return mime==="application/pdf"||IMAGE_TYPES.has(mime)||VIDEO_TYPES.has(mime)||AUDIO_TYPES.has(mime)||TEXT_TYPES.has(mime);}
+    function drivePreview(file){
+      clearPreview();
+      const body=$("previewBody");
+      const holder=document.createElement("div");holder.className="fallback";
+      const hint=document.createElement("p");
+      hint.textContent="Visualização pelo Google Drive. Se o arquivo não aparecer, clique em Abrir no Drive.";
+      const embedded=document.createElement("iframe");
+      embedded.title="Pré-visualização: "+file.name;
+      embedded.referrerPolicy="strict-origin-when-cross-origin";
+      embedded.src="https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/preview";
+      holder.append(hint,embedded);body.append(holder);
+    }
     async function previewFile(file){
       const mime=file.mimeType||"";
-      if(!canPreview(mime))return;
-      if(Number(file.size||"0")>PREVIEW_LIMIT){
-        notice("Arquivo maior que 30 MB: use Abrir no Drive para visualizar.");
-        return;
-      }
+      const localPreview=canPreview(mime) && Number(file.size||"0")<=PREVIEW_LIMIT;
       clearPreview();
       const dialog=$("previewDialog"),body=$("previewBody");
       $("previewTitle").textContent=file.name;
@@ -263,6 +304,7 @@
       const loading=document.createElement("p");loading.textContent="Carregando arquivo do seu Google Drive...";
       body.append(loading);
       if(!dialog.open)dialog.showModal();
+      if(!localPreview){drivePreview(file);return;}
       try{
         const res=await api("/drive/v3/files/"+encodeURIComponent(file.id)+"?alt=media");
         if(!dialog.open)return;
@@ -279,7 +321,7 @@
         if(node.tagName==="IFRAME"){node.title=file.name;node.setAttribute("sandbox","allow-scripts");}
         if(node.tagName==="VIDEO"||node.tagName==="AUDIO"){node.controls=true;node.preload="metadata";}
         body.append(node);
-      }catch(e){clearPreview();body.textContent="Não foi possível visualizar este documento. "+String(e.message||"");}
+      }catch(e){if(dialog.open){drivePreview(file);notice("Pré-visualização local indisponível; tentando Google Drive.");}}
     }
     function addCard(file){
       if(!state.ready){notice("Editor ainda não inicializado.");return;}
