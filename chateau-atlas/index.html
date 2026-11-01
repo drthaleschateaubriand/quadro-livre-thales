@@ -17,6 +17,17 @@
     #status{font-size:12px;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:36vw}
     main{position:relative;height:calc(100dvh - 52px)}
     #editor{width:100%;height:100%;border:0;background:white}
+    #documentLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+    .atlas-document{position:absolute;box-sizing:border-box;pointer-events:auto;display:flex;flex-direction:column;min-width:260px;min-height:190px;resize:both;overflow:hidden;border:1px solid #96a7c0;border-radius:10px;background:white;box-shadow:0 5px 25px #162f5240}
+    .atlas-document-head{height:42px;flex-shrink:0;display:flex;align-items:center;gap:7px;padding:5px 8px;background:#1b3152;color:white;cursor:move;touch-action:none}
+    .atlas-document-title{font-size:12px;font-weight:650;flex:1;min-width:0;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;user-select:none}
+    .atlas-document-head button{border:1px solid #7992b5;padding:5px 7px;font-size:11px;background:#304d75;color:white}
+    .atlas-document-body{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;align-items:stretch;justify-content:center;background:#fff;color:#172337}
+    .atlas-document-body iframe,.atlas-document-body video,.atlas-document-body img{width:100%;height:100%;border:0;object-fit:contain;flex:1;min-height:0}
+    .atlas-document-body audio{width:95%;align-self:center}
+    .atlas-document-body pre{white-space:pre-wrap;overflow:auto;flex:1;word-break:break-word;padding:14px;font:13px/1.5 ui-monospace,monospace}
+    .atlas-document-hint{margin:0;padding:5px 9px;background:#eff3fa;font-size:11px;color:#50627d}
+    @media(max-width:680px){.atlas-document{max-width:96vw}.atlas-document-head{height:44px}}
     aside{position:absolute;right:10px;top:10px;bottom:10px;z-index:2;width:min(370px,calc(100vw - 20px));padding:16px;
       border:1px solid #d8e0ea;border-radius:12px;box-shadow:0 8px 40px #14213933;background:#fff;overflow:auto}
     aside[hidden]{display:none}h2{font-size:17px;margin:0 0 8px}p{line-height:1.45;font-size:13px;color:#536277}
@@ -49,22 +60,23 @@
   <header>
     <div class="brand">CHATEAU ATLAS <span>Biblioteca visual</span></div>
     <button id="connect" type="button">Conectar Drive</button>
-    <button id="upload" type="button">Adicionar arquivo</button>
+    <button id="upload" type="button">Importar documento no quadro</button>
     <button id="drawerBtn" type="button" aria-expanded="false" aria-controls="drawer">Arquivos</button>
     <div id="status" role="status" aria-live="polite">Rascunho local. Drive desconectado.</div>
   </header>
   <main>
     <iframe id="editor" title="Editor visual draw.io" src="https://embed.diagrams.net/?embed=1&proto=json&spin=1&libraries=1&themes=1&noExitBtn=1"></iframe>
+    <div id="documentLayer" aria-label="Documentos importados sobre a tela infinita"></div>
     <aside id="drawer" hidden>
       <div class="row" style="justify-content:space-between;align-items:center"><h2>Arquivos no Atlas</h2><button id="closeDrawer" type="button">Fechar</button></div>
-      <p>Os arquivos originais ficam no seu Google Drive. No quadro, cada documento ganha um cartão com link para abri-lo.</p>
+      <p>Ao importar, PDFs, imagens, vídeos e áudios aparecem diretamente sobre o quadro. Word, Excel, PowerPoint e outros formatos usam a pré-visualização do Google Drive, quando disponível.</p>
       <div class="row">
         <button id="chooseFile" type="button">Adicionar do dispositivo</button>
         <button id="refresh" type="button">Atualizar lista</button>
         <button id="save" type="button">Salvar quadro</button>
       </div>
       <div id="dropZone" role="button" tabindex="0" aria-label="Adicionar arquivos do dispositivo">Arraste os arquivos para cá ou clique para escolher<strong style="display:block;margin-top:8px">PDF, Word, Excel, PowerPoint, MP3, MP4, imagens e outros formatos</strong></div>
-      <p id="fileHint">Os arquivos vão para uma pasta no Google Drive. Cada arquivo também ganha um cartão clicável na tela do Atlas.</p>
+      <p id="fileHint">Os arquivos originais permanecem no Google Drive. Mova os documentos pela barra superior e ajuste o tamanho pelo canto inferior direito. A posição é salva no Drive.</p>
       <p class="hint">O editor é o modo oficial incorporado do diagrams.net. O arquivo do quadro é salvo como .drawio no Drive após a autorização. Sem conexão, as alterações ficam apenas como rascunho neste navegador.</p>
       <ul id="files"><li><span>Conecte sua conta Google para consultar os arquivos.</span></li></ul>
       <button id="changeClient" type="button">Configurar acesso Google</button>
@@ -75,6 +87,7 @@
       <div id="previewBody"></div>
     </dialog>
   </main>
+  <script src="./documents.js"></script>
   <script>
   (() => {
     "use strict";
@@ -114,6 +127,10 @@
       dirty: false, saving: false, timer: null, cardCount: 0
     };
     function notice(message){ $("status").textContent = message; }
+    const documents=window.AtlasDocuments.create({
+      api,jsonApi,uploadMedia,getFolderId:()=>state.folderId,
+      getToken:()=>state.token,notice
+    });
     function send(action){ if(state.ready) frame.contentWindow.postMessage(JSON.stringify(action), EDITOR_ORIGIN); }
     function escapeXml(value){ return String(value).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c])); }
     function storeDraft(){
@@ -142,7 +159,7 @@
           if(url.protocol!=="https:")return;
           const match=url.hostname==="drive.google.com" && url.pathname.match(/^\/file\/d\/([^/]+)\/view$/);
           const file=match&&fileIndex.get(decodeURIComponent(match[1]));
-          if(file&&state.token){void previewFile(file);}else window.open(url.href,"_blank","noopener,noreferrer");
+          if(file&&state.token){documents.showFile(file);}else window.open(url.href,"_blank","noopener,noreferrer");
         }catch{}
       }
     });
@@ -201,6 +218,7 @@
         state.folderId=data.id;
       }
       await refreshFiles();
+      await documents.loadLayout();
       const boards=await jsonApi(driveQuery("'"+state.folderId+"' in parents and name='"+BOARD_NAME+"' and trashed=false"));
       if(boards.files?.length){
         state.boardId=boards.files[0].id;
@@ -257,13 +275,13 @@
         const path=driveQuery("'"+state.folderId+"' in parents and trashed=false")+(pageToken?"&pageToken="+encodeURIComponent(pageToken):"");
         const data=await jsonApi(path);
         for(const file of (data.files||[])){
-          if(file.name===BOARD_NAME)continue;
+          if(file.name===BOARD_NAME||file.name==="Posicoes do Atlas.json")continue;
           fileIndex.set(file.id,file);
           count++;
           const li=document.createElement("li"),name=document.createElement("span"),open=document.createElement("button"),add=document.createElement("button"),preview=document.createElement("button");
           name.textContent=file.name;name.title=file.name;
           open.textContent="Abrir";open.addEventListener("click",()=>window.open("https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/view","_blank","noopener,noreferrer"));
-          add.textContent="No quadro";add.addEventListener("click",()=>addCard(file));
+          add.textContent="No quadro";add.addEventListener("click",()=>documents.showFile(file));
           preview.textContent="Visualizar";
           preview.addEventListener("click",()=>void previewFile(file));
           li.append(name,preview,open,add);
@@ -349,7 +367,7 @@
         try{
           const uploaded=await uploadMedia(file.name,file.type||guessMime(file),file);
           fileIndex.set(uploaded.id,{...uploaded,size:String(file.size),mimeType:uploaded.mimeType||file.type||guessMime(file)});
-          addCard(uploaded);
+          documents.addFile(uploaded,file);
         }
         catch(e){notice("Falha ao enviar "+file.name+": "+e.message);return;}
       }
