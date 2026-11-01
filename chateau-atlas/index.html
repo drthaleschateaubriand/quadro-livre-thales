@@ -25,6 +25,15 @@
     #files{padding:0;list-style:none}#files li{display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #edf0f4;font-size:13px;min-width:0}
     #files li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
     #files li button{font-size:12px;padding:5px 7px}
+    #previewDialog{border:1px solid #d8e0ea;border-radius:12px;padding:0;width:min(1000px,96vw);max-width:none;max-height:93dvh;background:#fff;box-shadow:0 16px 60px #14213955}
+    #previewDialog::backdrop{background:#0b152b99}
+    .previewHead{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #dde4ee}
+    #previewTitle{font-weight:650;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #previewBody{height:min(75dvh,750px);overflow:auto;padding:12px;display:flex;align-items:center;justify-content:center;background:#f6f8fb}
+    #previewBody iframe{width:100%;height:100%;min-height:65dvh;border:0;background:#fff}
+    #previewBody img,#previewBody video{max-width:100%;max-height:100%;object-fit:contain}
+    #previewBody pre{width:100%;height:100%;overflow:auto;white-space:pre-wrap;word-break:break-word;align-self:stretch;margin:0;font:13px/1.5 ui-monospace,monospace;color:#162437}
+    @media(max-width:680px){#previewDialog{width:100vw;max-height:100dvh;height:100dvh;border-radius:0}#previewBody{height:calc(100dvh - 60px)}}
     .hint{font-size:12px;color:#66778d;background:#f3f6fa;padding:10px;border-radius:8px}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
     @media(max-width:680px){header{gap:6px;padding:0 6px}.brand span{display:none}header button{font-size:12px;padding:7px}#status{max-width:23vw;font-size:10px}}
@@ -54,6 +63,10 @@
       <button id="changeClient" type="button">Configurar acesso Google</button>
     </aside>
     <input id="picker" type="file" multiple aria-label="Selecionar documentos de qualquer formato">
+    <dialog id="previewDialog" aria-labelledby="previewTitle">
+      <div class="previewHead"><span id="previewTitle">Pré-visualização</span><button id="openPreviewDrive" type="button">Abrir no Drive</button><button id="closePreview" type="button">Fechar</button></div>
+      <div id="previewBody"></div>
+    </dialog>
   </main>
   <script>
   (() => {
@@ -67,6 +80,12 @@
     const EMPTY_XML = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>';
     const $ = id => document.getElementById(id);
     const frame = $("editor");
+    let previewUrl = null;
+    const PREVIEW_LIMIT = 30 * 1024 * 1024;
+    const IMAGE_TYPES = new Set(["image/png","image/jpeg","image/gif","image/webp"]);
+    const VIDEO_TYPES = new Set(["video/mp4","video/webm"]);
+    const AUDIO_TYPES = new Set(["audio/mpeg","audio/mp4","audio/ogg","audio/wav","audio/x-wav"]);
+    const TEXT_TYPES = new Set(["text/plain","text/markdown","text/csv","application/json"]);
     const state = {
       xml: localStorage.getItem(DRAFT_KEY) || EMPTY_XML, ready: false,
       token: null, folderId: null, boardId: null,
@@ -90,7 +109,10 @@
       if(!msg || !msg.event) return;
       if(msg.event==="init"){ state.ready=true; send({action:"load",xml:state.xml,autosave:1,title:"Chateau Atlas",noExitBtn:1}); }
       if(msg.event==="autosave"||msg.event==="save") changed(msg.xml);
-      if(msg.event==="export" && msg.format==="xml") changed(msg.xml);
+      if(msg.event==="export" && msg.format==="xml") {
+        changed(msg.xml);
+        if(state.token) void saveBoard();
+      }
       if(msg.event==="merge" && !msg.error) send({action:"export",format:"xml"});
       if(msg.event==="openLink" && msg.href){ try {const url=new URL(msg.href);if(url.protocol==="https:") window.open(url.href,"_blank","noopener,noreferrer");}catch{} }
     });
@@ -133,7 +155,7 @@
       if(obj!==null)options.body=JSON.stringify(obj);
       return (await api(path,options)).json();
     }
-    function driveQuery(q,fields="nextPageToken,files(id,name,mimeType,webViewLink,modifiedTime)"){
+    function driveQuery(q,fields="nextPageToken,files(id,name,mimeType,webViewLink,modifiedTime,size)"){
       return "/drive/v3/files?spaces=drive&pageSize=100&fields="+encodeURIComponent(fields)+"&q="+encodeURIComponent(q);
     }
     async function initializeDrive(){
@@ -202,15 +224,62 @@
         for(const file of (data.files||[])){
           if(file.name===BOARD_NAME)continue;
           count++;
-          const li=document.createElement("li"),name=document.createElement("span"),open=document.createElement("button"),add=document.createElement("button");
+          const li=document.createElement("li"),name=document.createElement("span"),open=document.createElement("button"),add=document.createElement("button"),preview=document.createElement("button");
           name.textContent=file.name;name.title=file.name;
           open.textContent="Abrir";open.addEventListener("click",()=>window.open("https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/view","_blank","noopener,noreferrer"));
           add.textContent="No quadro";add.addEventListener("click",()=>addCard(file));
-          li.append(name,open,add);list.append(li);
+          preview.textContent="Visualizar";
+          const mime=file.mimeType||"";
+          if(mime==="application/pdf"||IMAGE_TYPES.has(mime)||VIDEO_TYPES.has(mime)||AUDIO_TYPES.has(mime)||TEXT_TYPES.has(mime)){
+            preview.addEventListener("click",()=>void previewFile(file));
+            li.append(name,preview,open,add);
+          }else li.append(name,open,add);
+          list.append(li);
         }
         pageToken=data.nextPageToken||"";
       } while(pageToken&&count<300);
       if(!count){const li=document.createElement("li");li.textContent="Nenhum arquivo enviado por este aplicativo.";list.append(li);}
+    }
+    function clearPreview(){
+      const body=$("previewBody");
+      for(const media of body.querySelectorAll("video,audio")){media.pause();media.removeAttribute("src");}
+      body.replaceChildren();
+      if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}
+    }
+    function closePreview(){ $("previewDialog").close();clearPreview(); }
+    function canPreview(mime){return mime==="application/pdf"||IMAGE_TYPES.has(mime)||VIDEO_TYPES.has(mime)||AUDIO_TYPES.has(mime)||TEXT_TYPES.has(mime);}
+    async function previewFile(file){
+      const mime=file.mimeType||"";
+      if(!canPreview(mime))return;
+      if(Number(file.size||"0")>PREVIEW_LIMIT){
+        notice("Arquivo maior que 30 MB: use Abrir no Drive para visualizar.");
+        return;
+      }
+      clearPreview();
+      const dialog=$("previewDialog"),body=$("previewBody");
+      $("previewTitle").textContent=file.name;
+      const driveUrl="https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/view";
+      $("openPreviewDrive").onclick=()=>window.open(driveUrl,"_blank","noopener,noreferrer");
+      const loading=document.createElement("p");loading.textContent="Carregando arquivo do seu Google Drive...";
+      body.append(loading);
+      if(!dialog.open)dialog.showModal();
+      try{
+        const res=await api("/drive/v3/files/"+encodeURIComponent(file.id)+"?alt=media");
+        if(!dialog.open)return;
+        const blob=await res.blob();
+        if(!dialog.open)return;
+        if(blob.size>PREVIEW_LIMIT){clearPreview();body.textContent="Arquivo muito grande para pré-visualização. Abra no Google Drive.";return;}
+        clearPreview();
+        if(TEXT_TYPES.has(mime)){
+          const pre=document.createElement("pre");pre.textContent=await blob.text();body.append(pre);return;
+        }
+        previewUrl=URL.createObjectURL(new Blob([blob],{type:mime}));
+        const node=document.createElement(mime==="application/pdf"?"iframe":IMAGE_TYPES.has(mime)?"img":VIDEO_TYPES.has(mime)?"video":"audio");
+        node.src=previewUrl;
+        if(node.tagName==="IFRAME"){node.title=file.name;node.setAttribute("sandbox","allow-scripts");}
+        if(node.tagName==="VIDEO"||node.tagName==="AUDIO"){node.controls=true;node.preload="metadata";}
+        body.append(node);
+      }catch(e){clearPreview();body.textContent="Não foi possível visualizar este documento. "+String(e.message||"");}
     }
     function addCard(file){
       if(!state.ready){notice("Editor ainda não inicializado.");return;}
@@ -235,6 +304,8 @@
       notice("Arquivos enviados ao Google Drive.");
       try{await refreshFiles();}catch(e){notice("Upload concluído; erro ao atualizar lista: "+e.message);}
     }
+    $("closePreview").addEventListener("click",closePreview);
+    $("previewDialog").addEventListener("close",clearPreview);
     $("connect").addEventListener("click",connect);
     $("changeClient").addEventListener("click",setClientId);
     $("drawerBtn").addEventListener("click",()=>{const hidden=$("drawer").hidden;$("drawer").hidden=!hidden;$("drawerBtn").setAttribute("aria-expanded",String(hidden));});
@@ -243,7 +314,11 @@
     $("chooseFile").addEventListener("click",()=>{if(state.token)$("picker").click();else connect();});
     $("picker").addEventListener("change",e=>{const files=[...e.target.files];e.target.value="";if(files.length)uploadFiles(files);});
     $("refresh").addEventListener("click",async()=>{try{await refreshFiles();notice("Biblioteca atualizada.");}catch(e){notice(e.message);}});
-    $("save").addEventListener("click",()=>{send({action:"export",format:"xml"});state.dirty=true;setTimeout(saveBoard,700);});
+    $("save").addEventListener("click",()=>{
+      if(!state.ready){notice("Aguarde o editor carregar.");return;}
+      send({action:"export",format:"xml"});
+      notice("Preparando salvamento do quadro...");
+    });
     window.addEventListener("beforeunload",e=>{if(state.token&&state.dirty){e.preventDefault();e.returnValue="";}});
   })();
   </script>
