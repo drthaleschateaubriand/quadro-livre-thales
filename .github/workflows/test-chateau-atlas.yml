@@ -1,0 +1,23 @@
+name: Teste Chateau Atlas
+on:
+  push:
+    branches:
+      - feature/chateau-atlas-drive
+    paths:
+      - 'chateau-atlas/**'
+      - '.github/workflows/test-chateau-atlas.yml'
+  pull_request:
+    paths:
+      - 'chateau-atlas/**'
+      - '.github/workflows/test-chateau-atlas.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar código e segurança básica
+        run: node chateau-atlas/check.mjs
