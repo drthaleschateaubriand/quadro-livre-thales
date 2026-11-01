@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#172337">
+  <title>Chateau Atlas</title>
+  <style>
+    :root{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172337}
+    *{box-sizing:border-box}body{margin:0;background:#f7f9fc}
+    header{height:52px;display:flex;align-items:center;gap:12px;padding:0 14px;background:#172337;color:white}
+    .brand{font-weight:750;letter-spacing:.02em;white-space:nowrap}.brand span{font-weight:400;opacity:.75;font-size:12px}
+    button{font:inherit;cursor:pointer;border:1px solid #d4dce6;border-radius:7px;background:#fff;color:#172337;padding:8px 11px}
+    button:hover{background:#f2f6fa}button:disabled{opacity:.55;cursor:not-allowed}
+    header button{background:#31435e;color:#fff;border:1px solid #4b5e7b;white-space:nowrap}
+    header button:hover{background:#405575}
+    #status{font-size:12px;margin-left:auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:36vw}
+    main{position:relative;height:calc(100dvh - 52px)}
+    #editor{width:100%;height:100%;border:0;background:white}
+    #documentLayer{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+    .atlas-document{position:absolute;box-sizing:border-box;pointer-events:auto;display:flex;flex-direction:column;min-width:260px;min-height:190px;resize:both;overflow:hidden;border:1px solid #96a7c0;border-radius:10px;background:white;box-shadow:0 5px 25px #162f5240}
+    .atlas-document-head{height:42px;flex-shrink:0;display:flex;align-items:center;gap:7px;padding:5px 8px;background:#1b3152;color:white;cursor:move;touch-action:none}
+    .atlas-document-title{font-size:12px;font-weight:650;flex:1;min-width:0;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;user-select:none}
+    .atlas-document-head button{border:1px solid #7992b5;padding:5px 7px;font-size:11px;background:#304d75;color:white}
+    .atlas-document-body{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;align-items:stretch;justify-content:center;background:#fff;color:#172337}
+    .atlas-document-body iframe,.atlas-document-body video,.atlas-document-body img{width:100%;height:100%;border:0;object-fit:contain;flex:1;min-height:0}
+    .atlas-document-body audio{width:95%;align-self:center}
+    .atlas-document-body pre{white-space:pre-wrap;overflow:auto;flex:1;word-break:break-word;padding:14px;font:13px/1.5 ui-monospace,monospace}
+    .atlas-document-hint{margin:0;padding:5px 9px;background:#eff3fa;font-size:11px;color:#50627d}
+    @media(max-width:680px){.atlas-document{max-width:96vw}.atlas-document-head{height:44px}}
+    aside{position:absolute;right:10px;top:10px;bottom:10px;z-index:2;width:min(370px,calc(100vw - 20px));padding:16px;
+      border:1px solid #d8e0ea;border-radius:12px;box-shadow:0 8px 40px #14213933;background:#fff;overflow:auto}
+    aside[hidden]{display:none}h2{font-size:17px;margin:0 0 8px}p{line-height:1.45;font-size:13px;color:#536277}
+    .row{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.row button{font-size:13px}
+    input[type=file]{display:none}
+    #files{padding:0;list-style:none}#files li{display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #edf0f4;font-size:13px;min-width:0}
+    #files li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+    #files li button{font-size:12px;padding:5px 7px}
+    #dropZone{padding:16px;border:2px dashed #91a6c3;border-radius:10px;background:#f5f8ff;text-align:center;font-size:13px;color:#2c486c;cursor:pointer}
+    #dropZone.dragging{border-color:#2857b0;background:#e4edff}
+    #fileHint{font-size:12px;color:#526783;margin-top:8px}
+    #previewBody .fallback{width:100%;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;min-height:50vh;color:#526783;text-align:center}
+    #previewBody .fallback iframe{min-height:55vh;width:100%}
+    #previewDialog{border:1px solid #d8e0ea;border-radius:12px;padding:0;width:min(1000px,96vw);max-width:none;max-height:93dvh;background:#fff;box-shadow:0 16px 60px #14213955}
+    #previewDialog::backdrop{background:#0b152b99}
+    .previewHead{display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid #dde4ee}
+    #previewTitle{font-weight:650;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #previewBody{height:min(75dvh,750px);overflow:auto;padding:12px;display:flex;align-items:center;justify-content:center;background:#f6f8fb}
+    #previewBody iframe{width:100%;height:100%;min-height:65dvh;border:0;background:#fff}
+    #previewBody img,#previewBody video{max-width:100%;max-height:100%;object-fit:contain}
+    #previewBody pre{width:100%;height:100%;overflow:auto;white-space:pre-wrap;word-break:break-word;align-self:stretch;margin:0;font:13px/1.5 ui-monospace,monospace;color:#162437}
+    @media(max-width:680px){#previewDialog{width:100vw;max-height:100dvh;height:100dvh;border-radius:0}#previewBody{height:calc(100dvh - 60px)}}
+    .hint{font-size:12px;color:#66778d;background:#f3f6fa;padding:10px;border-radius:8px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:680px){header{gap:6px;padding:0 6px}.brand span{display:none}header button{font-size:12px;padding:7px}#status{max-width:23vw;font-size:10px}}
+  </style>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <header>
+    <div class="brand">CHATEAU ATLAS <span>Biblioteca visual</span></div>
+    <button id="connect" type="button">Conectar Drive</button>
+    <button id="upload" type="button">Importar documento no quadro</button>
+    <button id="drawerBtn" type="button" aria-expanded="false" aria-controls="drawer">Arquivos</button>
+    <div id="status" role="status" aria-live="polite">Rascunho local. Drive desconectado.</div>
+  </header>
+  <main>
+    <iframe id="editor" title="Editor visual draw.io" src="https://embed.diagrams.net/?embed=1&proto=json&spin=1&libraries=1&themes=1&noExitBtn=1"></iframe>
+    <div id="documentLayer" aria-label="Documentos importados sobre a tela infinita"></div>
+    <aside id="drawer" hidden>
+      <div class="row" style="justify-content:space-between;align-items:center"><h2>Arquivos no Atlas</h2><button id="closeDrawer" type="button">Fechar</button></div>
+      <p>Ao importar, PDFs, imagens, vídeos e áudios aparecem diretamente sobre o quadro. Word, Excel, PowerPoint e outros formatos usam a pré-visualização do Google Drive, quando disponível.</p>
+      <div class="row">
+        <button id="chooseFile" type="button">Adicionar do dispositivo</button>
+        <button id="refresh" type="button">Atualizar lista</button>
+        <button id="save" type="button">Salvar quadro</button>
+      </div>
+      <div id="dropZone" role="button" tabindex="0" aria-label="Adicionar arquivos do dispositivo">Arraste os arquivos para cá ou clique para escolher<strong style="display:block;margin-top:8px">PDF, Word, Excel, PowerPoint, MP3, MP4, imagens e outros formatos</strong></div>
+      <p id="fileHint">Os arquivos originais permanecem no Google Drive. Mova os documentos pela barra superior e ajuste o tamanho pelo canto inferior direito. A posição é salva no Drive.</p>
+      <p class="hint">O editor é o modo oficial incorporado do diagrams.net. O arquivo do quadro é salvo como .drawio no Drive após a autorização. Sem conexão, as alterações ficam apenas como rascunho neste navegador.</p>
+      <ul id="files"><li><span>Conecte sua conta Google para consultar os arquivos.</span></li></ul>
+      <button id="changeClient" type="button">Configurar acesso Google</button>
+    </aside>
+    <input id="picker" type="file" multiple aria-label="Selecionar documentos de qualquer formato">
+    <dialog id="previewDialog" aria-labelledby="previewTitle">
+      <div class="previewHead"><span id="previewTitle">Pré-visualização</span><button id="openPreviewDrive" type="button">Abrir no Drive</button><button id="closePreview" type="button">Fechar</button></div>
+      <div id="previewBody"></div>
+    </dialog>
+  </main>
+  <script src="./documents.js"></script>
+  <script>
+  (() => {
+    "use strict";
+    const EDITOR_ORIGIN = "https://embed.diagrams.net";
+    const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+    const BOARD_NAME = "Meu Atlas.drawio";
+    const FOLDER_NAME = "Chateau Atlas";
+    const DRAFT_KEY = "chateau-atlas:rascunho";
+    const CLIENT_KEY = "chateau-atlas:oauth-client";
+    const EMPTY_XML = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel>';
+    const $ = id => document.getElementById(id);
+    const frame = $("editor");
+    let previewUrl = null;
+    const PREVIEW_LIMIT = 30 * 1024 * 1024;
+    const IMAGE_TYPES = new Set(["image/png","image/jpeg","image/gif","image/webp"]);
+    const VIDEO_TYPES = new Set(["video/mp4","video/webm"]);
+    const AUDIO_TYPES = new Set(["audio/mpeg","audio/mp4","audio/ogg","audio/wav","audio/x-wav"]);
+    const TEXT_TYPES = new Set(["text/plain","text/markdown","text/csv","application/json","text/html","text/xml"]);
+    const pendingFiles = [];
+    const fileIndex = new Map();
+    function guessMime(file) {
+      const extension=(file.name||"").toLowerCase().split(".").pop();
+      const types={
+        pdf:"application/pdf",doc:"application/msword",docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        xls:"application/vnd.ms-excel",xlsx:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ppt:"application/vnd.ms-powerpoint",pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        mp3:"audio/mpeg",m4a:"audio/mp4",wav:"audio/wav",ogg:"audio/ogg",
+        mp4:"video/mp4",mov:"video/quicktime",webm:"video/webm",avi:"video/x-msvideo",
+        png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",
+        txt:"text/plain",md:"text/markdown",csv:"text/csv",json:"application/json"
+      };
+      return types[extension]||"application/octet-stream";
+    }
+    const state = {
+      xml: localStorage.getItem(DRAFT_KEY) || EMPTY_XML, ready: false,
+      token: null, folderId: null, boardId: null,
+      dirty: false, saving: false, timer: null, cardCount: 0
+    };
+    function notice(message){ $("status").textContent = message; }
+    const documents=window.AtlasDocuments.create({
+      api,jsonApi,uploadMedia,getFolderId:()=>state.folderId,
+      getToken:()=>state.token,notice
+    });
+    function send(action){ if(state.ready) frame.contentWindow.postMessage(JSON.stringify(action), EDITOR_ORIGIN); }
+    function escapeXml(value){ return String(value).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c])); }
+    function storeDraft(){
+      try { localStorage.setItem(DRAFT_KEY, state.xml); } catch(e) { notice("Rascunho local excedeu o espaço. Conecte o Drive."); }
+    }
+    function changed(xml){
+      if(typeof xml !== "string" || !xml.trim()) return;
+      state.xml=xml; state.dirty=true; storeDraft();
+      if(state.token){ notice("Alterações pendentes no Drive"); clearTimeout(state.timer); state.timer=setTimeout(saveBoard,1800); }
+      else notice("Rascunho local. Drive desconectado.");
+    }
+    window.addEventListener("message", event => {
+      if(event.origin !== EDITOR_ORIGIN || event.source !== frame.contentWindow) return;
+      let msg;try { msg=typeof event.data==="string"?JSON.parse(event.data):event.data; }catch{return;}
+      if(!msg || !msg.event) return;
+      if(msg.event==="init"){ state.ready=true; send({action:"load",xml:state.xml,autosave:1,title:"Chateau Atlas",noExitBtn:1,suppressNewWindows:true}); }
+      if(msg.event==="autosave"||msg.event==="save") changed(msg.xml);
+      if(msg.event==="export" && msg.format==="xml") {
+        changed(msg.xml);
+        if(state.token) void saveBoard();
+      }
+      if(msg.event==="merge" && !msg.error) send({action:"export",format:"xml"});
+      if(msg.event==="openLink" && msg.href){
+        try{
+          const url=new URL(msg.href);
+          if(url.protocol!=="https:")return;
+          const match=url.hostname==="drive.google.com" && url.pathname.match(/^\/file\/d\/([^/]+)\/view$/);
+          const file=match&&fileIndex.get(decodeURIComponent(match[1]));
+          if(file&&state.token){documents.showFile(file);}else window.open(url.href,"_blank","noopener,noreferrer");
+        }catch{}
+      }
+    });
+    function clientId(){return localStorage.getItem(CLIENT_KEY)||"";}
+    function setClientId(){
+      const value=prompt("Cole seu OAuth Client ID do Google Cloud (tipo Aplicativo Web). Não cole senhas nem chaves privadas.",clientId());
+      if(value!==null){ const id=value.trim();if(id && !/^[\w.-]+\.apps\.googleusercontent\.com$/.test(id)){alert("Client ID inválido. Deve terminar em .apps.googleusercontent.com");return;}
+        if(id)localStorage.setItem(CLIENT_KEY,id);else localStorage.removeItem(CLIENT_KEY);
+      }
+    }
+    async function connect(){
+      if(!clientId()){setClientId();if(!clientId())return;}
+      if(!window.google?.accounts?.oauth2){notice("Serviço de login Google não carregou. Recarregue a página.");return;}
+      const oauth=google.accounts.oauth2.initTokenClient({
+        client_id:clientId(),scope:DRIVE_SCOPE,
+        callback:async response=>{
+          if(response.error||!response.access_token){notice("A autorização do Google não foi concluída.");return;}
+          state.token=response.access_token;
+          $("connect").textContent="Drive conectado";
+          try{
+            notice("Procurando biblioteca no Drive...");
+            await initializeDrive();
+            notice("Drive conectado. Salvamento disponível.");
+            if(pendingFiles.length)await uploadFiles(pendingFiles.splice(0));
+          }
+          catch(e){notice("Erro do Drive: "+e.message);}
+        },
+        error_callback:()=>notice("Não foi possível abrir a autorização Google.")
+      });
+      oauth.requestAccessToken({prompt:"consent"});
+    }
+    async function api(path,options={}){
+      if(!state.token) throw Error("Conecte o Google Drive.");
+      const headers=new Headers(options.headers||{});
+      headers.set("Authorization","Bearer "+state.token);
+      const res=await fetch(path.startsWith("https:")?path:"https://www.googleapis.com"+path,{...options,headers});
+      if(!res.ok){let detail="";try{const j=await res.json();detail=j.error?.message||"";}catch{}
+        if(res.status===401) state.token=null;
+        throw Error((detail||"Falha na API do Drive")+" ("+res.status+")");
+      }
+      return res;
+    }
+    async function jsonApi(path,method="GET",obj=null){
+      const options={method,headers:{"Content-Type":"application/json"}};
+      if(obj!==null)options.body=JSON.stringify(obj);
+      return (await api(path,options)).json();
+    }
+    function driveQuery(q,fields="nextPageToken,files(id,name,mimeType,webViewLink,modifiedTime,size)"){
+      return "/drive/v3/files?spaces=drive&pageSize=100&fields="+encodeURIComponent(fields)+"&q="+encodeURIComponent(q);
+    }
+    async function initializeDrive(){
+      let data=await jsonApi(driveQuery("name='"+FOLDER_NAME+"' and mimeType='application/vnd.google-apps.folder' and trashed=false"));
+      state.folderId=data.files?.[0]?.id;
+      if(!state.folderId){
+        data=await jsonApi("/drive/v3/files?fields=id,name","POST",{name:FOLDER_NAME,mimeType:"application/vnd.google-apps.folder"});
+        state.folderId=data.id;
+      }
+      await refreshFiles();
+      await documents.loadLayout();
+      const boards=await jsonApi(driveQuery("'"+state.folderId+"' in parents and name='"+BOARD_NAME+"' and trashed=false"));
+      if(boards.files?.length){
+        state.boardId=boards.files[0].id;
+        const res=await api("/drive/v3/files/"+encodeURIComponent(state.boardId)+"?alt=media");
+        const xml=await res.text();
+        if(xml.trim()){
+          if(state.xml!==EMPTY_XML && state.xml!==xml &&
+             !window.confirm("Há um rascunho local diferente do quadro no Google Drive. OK: abrir o quadro do Drive. Cancelar: manter o rascunho local e salvá-lo no Drive.")){
+            state.dirty=true;await saveBoard();
+          }else{
+            state.xml=xml;storeDraft();state.dirty=false;
+            send({action:"load",xml:state.xml,autosave:1,title:"Chateau Atlas",noExitBtn:1});
+          }
+        }
+      }else{
+        state.boardId=null;state.dirty=true;await saveBoard();
+      }
+    }
+    async function uploadMedia(name,mime,blob){
+      if(!state.folderId)throw Error("Biblioteca Google Drive não inicializada.");
+      const metadata={name,mimeType:mime||"application/octet-stream",parents:[state.folderId]};
+      const init=await api("/upload/drive/v3/files?uploadType=resumable&fields=id,name,mimeType,webViewLink",{
+        method:"POST",
+        headers:{"Content-Type":"application/json; charset=UTF-8","X-Upload-Content-Type":metadata.mimeType,"X-Upload-Content-Length":String(blob.size)},
+        body:JSON.stringify(metadata)
+      });
+      const location=init.headers.get("Location");
+      if(!location)throw Error("Google Drive não retornou a sessão de upload.");
+      return (await api(location,{method:"PUT",headers:{"Content-Type":metadata.mimeType},body:blob})).json();
+    }
+    async function saveBoard(){
+      clearTimeout(state.timer);
+      if(!state.token||!state.folderId||!state.dirty||state.saving)return;
+      state.saving=true;state.dirty=false;notice("Salvando quadro no Google Drive...");
+      try{
+        const blob=new Blob([state.xml],{type:"application/xml"});
+        if(!state.boardId){
+          const file=await uploadMedia(BOARD_NAME,"application/xml",blob);
+          state.boardId=file.id;
+        }else{
+          await api("/upload/drive/v3/files/"+encodeURIComponent(state.boardId)+"?uploadType=media",{
+            method:"PATCH",headers:{"Content-Type":"application/xml"},body:blob
+          });
+        }
+        notice(state.dirty?"Novas alterações pendentes":"Quadro salvo no Google Drive.");
+      }catch(e){state.dirty=true;notice("Não salvo no Drive: "+e.message);}
+      finally{state.saving=false;if(state.dirty&&state.token){state.timer=setTimeout(saveBoard,2500);}}
+    }
+    async function refreshFiles(){
+      if(!state.folderId)return;
+      const list=$("files");list.replaceChildren();fileIndex.clear();
+      let pageToken="",count=0;
+      do {
+        const path=driveQuery("'"+state.folderId+"' in parents and trashed=false")+(pageToken?"&pageToken="+encodeURIComponent(pageToken):"");
+        const data=await jsonApi(path);
+        for(const file of (data.files||[])){
+          if(file.name===BOARD_NAME||file.name==="Posicoes do Atlas.json")continue;
+          fileIndex.set(file.id,file);
+          count++;
+          const li=document.createElement("li"),name=document.createElement("span"),open=document.createElement("button"),add=document.createElement("button"),preview=document.createElement("button");
+          name.textContent=file.name;name.title=file.name;
+          open.textContent="Abrir";open.addEventListener("click",()=>window.open("https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/view","_blank","noopener,noreferrer"));
+          add.textContent="No quadro";add.addEventListener("click",()=>documents.showFile(file));
+          preview.textContent="Visualizar";
+          preview.addEventListener("click",()=>void previewFile(file));
+          li.append(name,preview,open,add);
+          list.append(li);
+        }
+        pageToken=data.nextPageToken||"";
+      } while(pageToken&&count<300);
+      if(!count){const li=document.createElement("li");li.textContent="Nenhum arquivo enviado por este aplicativo.";list.append(li);}
+    }
+    function clearPreview(){
+      const body=$("previewBody");
+      for(const media of body.querySelectorAll("video,audio")){media.pause();media.removeAttribute("src");}
+      body.replaceChildren();
+      if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}
+    }
+    function closePreview(){ $("previewDialog").close();clearPreview(); }
+    function canPreview(mime){return mime==="application/pdf"||IMAGE_TYPES.has(mime)||VIDEO_TYPES.has(mime)||AUDIO_TYPES.has(mime)||TEXT_TYPES.has(mime);}
+    function drivePreview(file){
+      clearPreview();
+      const body=$("previewBody");
+      const holder=document.createElement("div");holder.className="fallback";
+      const hint=document.createElement("p");
+      hint.textContent="Visualização pelo Google Drive. Se o arquivo não aparecer, clique em Abrir no Drive.";
+      const embedded=document.createElement("iframe");
+      embedded.title="Pré-visualização: "+file.name;
+      embedded.referrerPolicy="strict-origin-when-cross-origin";
+      embedded.src="https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/preview";
+      holder.append(hint,embedded);body.append(holder);
+    }
+    async function previewFile(file){
+      const mime=file.mimeType||"";
+      const localPreview=canPreview(mime) && Number(file.size||"0")<=PREVIEW_LIMIT;
+      clearPreview();
+      const dialog=$("previewDialog"),body=$("previewBody");
+      $("previewTitle").textContent=file.name;
+      const driveUrl="https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/view";
+      $("openPreviewDrive").onclick=()=>window.open(driveUrl,"_blank","noopener,noreferrer");
+      const loading=document.createElement("p");loading.textContent="Carregando arquivo do seu Google Drive...";
+      body.append(loading);
+      if(!dialog.open)dialog.showModal();
+      if(!localPreview){drivePreview(file);return;}
+      try{
+        const res=await api("/drive/v3/files/"+encodeURIComponent(file.id)+"?alt=media");
+        if(!dialog.open)return;
+        const blob=await res.blob();
+        if(!dialog.open)return;
+        if(blob.size>PREVIEW_LIMIT){clearPreview();body.textContent="Arquivo muito grande para pré-visualização. Abra no Google Drive.";return;}
+        clearPreview();
+        if(TEXT_TYPES.has(mime)){
+          const pre=document.createElement("pre");pre.textContent=await blob.text();body.append(pre);return;
+        }
+        previewUrl=URL.createObjectURL(new Blob([blob],{type:mime}));
+        const node=document.createElement(mime==="application/pdf"?"iframe":IMAGE_TYPES.has(mime)?"img":VIDEO_TYPES.has(mime)?"video":"audio");
+        node.src=previewUrl;
+        if(node.tagName==="IFRAME"){node.title=file.name;node.setAttribute("sandbox","allow-scripts");}
+        if(node.tagName==="VIDEO"||node.tagName==="AUDIO"){node.controls=true;node.preload="metadata";}
+        body.append(node);
+      }catch(e){if(dialog.open){drivePreview(file);notice("Pré-visualização local indisponível; tentando Google Drive.");}}
+    }
+    function addCard(file){
+      if(!state.ready){notice("Editor ainda não inicializado.");return;}
+      const name=escapeXml(file.name),url=escapeXml("https://drive.google.com/file/d/"+encodeURIComponent(file.id)+"/view");
+      const id="atlas-"+Date.now()+"-"+(++state.cardCount);
+      const x=80+((state.cardCount-1)%4)*280, y=80+Math.floor((state.cardCount-1)/4)*120;
+      const xml='<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>'+
+        '<UserObject id="'+id+'" label="'+name+'" link="'+url+'">'+
+        '<mxCell style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#687d9c;fillColor=#f2f6fd;fontSize=15;spacing=10;" vertex="1" parent="1">'+
+        '<mxGeometry x="'+x+'" y="'+y+'" width="250" height="80" as="geometry"/></mxCell></UserObject>'+
+        '</root></mxGraphModel>';
+      send({action:"merge",xml});
+      notice("Cartão do documento enviado ao editor.");
+    }
+    async function uploadFiles(files){
+      if(!state.token){
+        pendingFiles.push(...files);
+        $("drawer").hidden=false;
+        notice("Arquivos selecionados. Autorize sua conta Google para enviá-los.");
+        await connect();return;
+      }
+      for(let i=0;i<files.length;i++){
+        const file=files[i];
+        notice("Enviando "+(i+1)+" de "+files.length+": "+file.name);
+        try{
+          const uploaded=await uploadMedia(file.name,file.type||guessMime(file),file);
+          fileIndex.set(uploaded.id,{...uploaded,size:String(file.size),mimeType:uploaded.mimeType||file.type||guessMime(file)});
+          documents.addFile(uploaded,file);
+        }
+        catch(e){notice("Falha ao enviar "+file.name+": "+e.message);return;}
+      }
+      notice("Arquivos enviados ao Google Drive.");
+      try{await refreshFiles();}catch(e){notice("Upload concluído; erro ao atualizar lista: "+e.message);}
+    }
+    $("closePreview").addEventListener("click",closePreview);
+    $("previewDialog").addEventListener("close",clearPreview);
+    $("connect").addEventListener("click",connect);
+    $("changeClient").addEventListener("click",setClientId);
+    $("drawerBtn").addEventListener("click",()=>{const hidden=$("drawer").hidden;$("drawer").hidden=!hidden;$("drawerBtn").setAttribute("aria-expanded",String(hidden));});
+    $("closeDrawer").addEventListener("click",()=>{$("drawer").hidden=true;$("drawerBtn").setAttribute("aria-expanded","false");});
+    $("upload").addEventListener("click",()=>$("picker").click());
+    $("chooseFile").addEventListener("click",()=>$("picker").click());
+    $("dropZone").addEventListener("click",()=>$("picker").click());
+    $("dropZone").addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();$("picker").click();}});
+    for(const target of [$("dropZone"),$("drawer")]){
+      target.addEventListener("dragover",e=>{
+        if(e.dataTransfer?.types?.includes("Files")){e.preventDefault();$("dropZone").classList.add("dragging");}
+      });
+      target.addEventListener("dragleave",()=>$("dropZone").classList.remove("dragging"));
+      target.addEventListener("drop",e=>{
+        e.preventDefault();e.stopPropagation();$("dropZone").classList.remove("dragging");
+        if(e.dataTransfer?.files?.length)void uploadFiles([...e.dataTransfer.files]);
+      });
+    }
+    $("picker").addEventListener("change",e=>{const files=[...e.target.files];e.target.value="";if(files.length)uploadFiles(files);});
+    $("refresh").addEventListener("click",async()=>{try{await refreshFiles();notice("Biblioteca atualizada.");}catch(e){notice(e.message);}});
+    $("save").addEventListener("click",()=>{
+      if(!state.ready){notice("Aguarde o editor carregar.");return;}
+      send({action:"export",format:"xml"});
+      notice("Preparando salvamento do quadro...");
+    });
+    window.addEventListener("beforeunload",e=>{if(state.token&&state.dirty){e.preventDefault();e.returnValue="";}});
+  })();
+  </script>
+</body>
+</html>
